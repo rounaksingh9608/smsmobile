@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Manrope } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/app/components/Toast";
@@ -15,9 +15,6 @@ const manrope = Manrope({
   variable: "--font-manrope",
   display: 'swap',
 });
-
-import type { Metadata, Viewport } from "next";
-
 export const viewport: Viewport = {
   themeColor: '#00236f',
   width: 'device-width',
