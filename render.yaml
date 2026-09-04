@@ -8,6 +8,7 @@ services:
   - type: web
     name: sms-backend
     env: node
+    rootDir: app
     buildCommand: npm install && npm run build
     startCommand: npm start
     plan: free
