@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Estate Pillar - Resident Home</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts for Typography Hierarchy -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS with specific configuration -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "on-error-container": "#93000a",
+                "surface-subtle": "#F8FAFC",
+                "tertiary-container": "#003d88",
+                "on-primary": "#ffffff",
+                "inverse-primary": "#b6c4ff",
+                "on-tertiary-fixed": "#001a42",
+                "status-warning": "#F59E0B",
+                "tertiary-fixed": "#d8e2ff",
+                "on-primary-fixed": "#00164e",
+                "tertiary": "#00285e",
+                "on-tertiary-container": "#82abff",
+                "primary-container": "#1e3a8a",
+                "secondary": "#565e74",
+                "inverse-surface": "#213145",
+                "status-success": "#10B981",
+                "on-tertiary": "#ffffff",
+                "on-secondary-fixed": "#131b2e",
+                "background": "#f8f9ff",
+                "inverse-on-surface": "#eaf1ff",
+                "tertiary-fixed-dim": "#adc6ff",
+                "border-low": "#E2E8F0",
+                "on-background": "#0b1c30",
+                "surface-container-low": "#eff4ff",
+                "on-surface-variant": "#444651",
+                "on-secondary-container": "#5c647a",
+                "surface-bright": "#f8f9ff",
+                "primary": "#00236f",
+                "primary-fixed-dim": "#b6c4ff",
+                "on-secondary": "#ffffff",
+                "secondary-fixed-dim": "#bec6e0",
+                "on-tertiary-fixed-variant": "#004395",
+                "surface-container-lowest": "#ffffff",
+                "secondary-container": "#dae2fd",
+                "secondary-fixed": "#dae2fd",
+                "outline-variant": "#c5c5d3",
+                "error": "#ba1a1a",
+                "surface-dim": "#cbdbf5",
+                "surface-container-high": "#dce9ff",
+                "surface-container-highest": "#d3e4fe",
+                "outline": "#757682",
+                "on-secondary-fixed-variant": "#3f465c",
+                "surface-tint": "#4059aa",
+                "surface-variant": "#d3e4fe",
+                "surface-container": "#e5eeff",
+                "on-primary-container": "#90a8ff",
+                "on-surface": "#0b1c30",
+                "on-primary-fixed-variant": "#264191",
+                "status-info": "#6366F1",
+                "error-container": "#ffdad6",
+                "primary-fixed": "#dce1ff",
+                "surface": "#f8f9ff",
+                "status-danger": "#EF4444",
+                "on-error": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "stack-sm": "12px",
+                    "container-margin-desktop": "40px",
+                    "stack-lg": "48px",
+                    "stack-md": "24px",
+                    "container-margin-mobile": "16px",
+                    "base": "8px",
+                    "gutter-grid": "24px"
+            },
+            "fontFamily": {
+                    "body-md": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "headline-lg-mobile": ["Manrope"],
+                    "body-sm": ["Inter"],
+                    "display-metrics": ["Manrope"],
+                    "label-caps": ["Inter"],
+                    "headline-md": ["Manrope"],
+                    "headline-lg": ["Manrope"]
+            },
+            "fontSize": {
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "display-metrics": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-subtle font-body-md text-body-md text-on-surface antialiased min-h-screen pb-24 md:pb-8">
+<!-- TopAppBar (Shared Component Implementation) -->
+<header class="bg-surface shadow-sm w-full top-0 sticky z-40 flex justify-between items-center px-container-margin-mobile md:px-container-margin-desktop py-4">
+<!-- Leading Content -->
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold">R</div>
+<div class="font-headline-md text-headline-md font-bold text-primary">Estate Pillar • Unit 402</div>
+</div>
+<!-- Desktop Navigation Cluster (Visible only on md+) -->
+<nav class="hidden md:flex items-center gap-8">
+<a class="font-label-caps text-label-caps text-primary border-b-2 border-primary pb-1 flex items-center gap-2" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span> Home
+            </a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-lg flex items-center gap-2" href="#">
+<span class="material-symbols-outlined">rebase_edit</span> Services
+            </a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-lg flex items-center gap-2" href="#">
+<span class="material-symbols-outlined">groups</span> Community
+            </a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors px-3 py-2 rounded-lg flex items-center gap-2 relative" href="#">
+<span class="material-symbols-outlined">notifications</span> Alerts
+                <span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-status-danger"></span>
+</a>
+</nav>
+<!-- Trailing Content -->
+<button class="text-on-surface-variant hover:bg-surface-container-low transition-colors active:scale-95 transition-transform p-2 rounded-full">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</header>
+<!-- Main Canvas -->
+<main class="max-w-6xl mx-auto px-container-margin-mobile md:px-container-margin-desktop py-stack-md flex flex-col gap-stack-lg">
+<!-- Header / Greeting -->
+<section>
+<h1 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Good morning, Ritesh</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Tower A · Flat 402</p>
+</section>
+<!-- Critical Alerts / Bento Grid -->
+<section class="grid grid-cols-1 md:grid-cols-2 gap-stack-sm md:gap-gutter-grid">
+<!-- Visitor Alert Card (High Priority, Custom Style) -->
+<div class="bg-primary text-on-primary rounded-xl p-stack-md shadow-[0_4px_20px_rgba(0,0,0,0.1)] flex flex-col justify-between relative overflow-hidden group hover:shadow-lg transition-shadow cursor-pointer min-h-[160px]">
+<div class="relative z-10 flex justify-between items-start w-full">
+<div>
+<div class="font-label-caps text-label-caps text-on-primary-container mb-2 flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">priority_high</span> ACTION REQUIRED
+                        </div>
+<h2 class="font-headline-md text-headline-md">1 Visitor Waiting</h2>
+<p class="font-body-sm text-body-sm text-inverse-primary mt-1">Main Gate • Arrived 2 mins ago</p>
+</div>
+<div class="flex gap-2">
+<button class="w-12 h-12 rounded-full bg-status-success text-on-primary flex items-center justify-center hover:bg-opacity-90 active:scale-95 transition-all shadow-md z-20">
+<span class="material-symbols-outlined">check</span>
+</button>
+</div>
+</div>
+<!-- Decorative Graphic -->
+<span class="material-symbols-outlined absolute -right-6 -bottom-6 text-[140px] text-primary-fixed opacity-10 transform -rotate-12 group-hover:scale-110 transition-transform pointer-events-none">person_alert</span>
+</div>
+<!-- Financial Alert Card -->
+<div class="bg-surface rounded-xl p-stack-md shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-border-low flex flex-col justify-between hover:shadow-md hover:border-primary/20 transition-all min-h-[160px]">
+<div class="flex justify-between items-start">
+<div>
+<div class="font-label-caps text-label-caps text-status-warning mb-2 flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">warning</span> PENDING PAYMENT
+                        </div>
+<div class="font-display-metrics text-display-metrics text-on-surface">$250</div>
+</div>
+<span class="material-symbols-outlined text-outline text-[32px]">receipt_long</span>
+</div>
+<div class="flex justify-between items-end mt-4">
+<p class="font-body-sm text-body-sm text-on-surface-variant">Maintenance • Due in 3 days</p>
+<button class="bg-secondary-container text-on-secondary-container font-label-caps text-label-caps px-4 py-2 rounded-lg hover:bg-primary hover:text-on-primary transition-colors active:scale-95">PAY NOW</button>
+</div>
+</div>
+</section>
+<!-- Quick Actions Grid -->
+<section>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-stack-sm">Quick Actions</h2>
+<div class="grid grid-cols-3 md:grid-cols-6 gap-stack-sm md:gap-gutter-grid">
+<button class="flex flex-col items-center justify-center gap-3 p-4 bg-surface rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-border-low hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:border-primary/30 active:scale-95 transition-all group">
+<div class="w-12 h-12 rounded-full bg-surface-container-low text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined">person_add</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-center leading-tight">Invite<br/>Visitor</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-3 p-4 bg-surface rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-border-low hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:border-primary/30 active:scale-95 transition-all group">
+<div class="w-12 h-12 rounded-full bg-surface-container-low text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-center leading-tight">Pay<br/>Maintenance</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-3 p-4 bg-surface rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-border-low hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:border-primary/30 active:scale-95 transition-all group">
+<div class="w-12 h-12 rounded-full bg-surface-container-low text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined">report_problem</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-center leading-tight">Raise<br/>Complaint</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-3 p-4 bg-surface rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-border-low hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:border-primary/30 active:scale-95 transition-all group">
+<div class="w-12 h-12 rounded-full bg-surface-container-low text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined">calendar_month</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-center leading-tight">Book<br/>Facility</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-3 p-4 bg-surface rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-border-low hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:border-primary/30 active:scale-95 transition-all group">
+<div class="w-12 h-12 rounded-full bg-surface-container-low text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined">local_shipping</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-center leading-tight">Track<br/>Delivery</span>
+</button>
+<!-- Calm but prominent Emergency CTA -->
+<button class="flex flex-col items-center justify-center gap-3 p-4 bg-surface rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-error/30 hover:shadow-[0_4px_20px_rgba(0,0,0,0.1)] active:scale-95 transition-all group relative overflow-hidden">
+<div class="absolute inset-0 bg-error-container/20 group-hover:bg-error-container/40 transition-colors"></div>
+<div class="relative w-12 h-12 rounded-full bg-surface text-status-danger border border-error/20 flex items-center justify-center group-hover:bg-error group-hover:text-on-error transition-colors">
+<span class="material-symbols-outlined">e911_emergency</span>
+</div>
+<span class="relative font-body-sm text-body-sm text-status-danger font-medium text-center leading-tight">SOS<br/>Emergency</span>
+</button>
+</div>
+</section>
+<!-- Recent Activity Feed -->
+<section class="bg-surface rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-border-low p-stack-md md:p-stack-lg">
+<div class="flex justify-between items-center mb-6">
+<h2 class="font-headline-md text-headline-md text-on-surface">Recent Activity</h2>
+<button class="font-label-caps text-label-caps text-primary hover:bg-surface-container-low px-3 py-2 rounded-lg transition-colors">VIEW ALL</button>
+</div>
+<div class="flex flex-col gap-0">
+<!-- Activity Item: Success -->
+<div class="flex items-start gap-4 py-4 border-b border-border-low last:border-0 last:pb-0 group hover:bg-surface-subtle transition-colors -mx-stack-md px-stack-md rounded-lg">
+<div class="w-10 h-10 rounded-full bg-status-success/10 text-status-success flex items-center justify-center shrink-0 mt-1">
+<span class="material-symbols-outlined text-[20px]">how_to_reg</span>
+</div>
+<div class="flex-1">
+<h3 class="font-body-md text-body-md text-on-surface font-medium">Visitor Approved</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Amazon Delivery (OTP Verified at Main Gate)</p>
+</div>
+<span class="font-label-caps text-label-caps text-outline whitespace-nowrap mt-1">10 MIN AGO</span>
+</div>
+<!-- Activity Item: Info -->
+<div class="flex items-start gap-4 py-4 border-b border-border-low last:border-0 last:pb-0 group hover:bg-surface-subtle transition-colors -mx-stack-md px-stack-md rounded-lg">
+<div class="w-10 h-10 rounded-full bg-surface-container text-primary flex items-center justify-center shrink-0 mt-1">
+<span class="material-symbols-outlined text-[20px]">campaign</span>
+</div>
+<div class="flex-1">
+<h3 class="font-body-md text-body-md text-on-surface font-medium">New Notice</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Water supply interruption scheduled for tomorrow 2 PM - 4 PM due to maintenance.</p>
+</div>
+<span class="font-label-caps text-label-caps text-outline whitespace-nowrap mt-1">2 HRS AGO</span>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar (Shared Component Implementation - Visible only on mobile) -->
+<nav class="bg-surface shadow-[0_-4px_20px_rgba(0,0,0,0.05)] fixed bottom-0 w-full z-50 rounded-t-xl flex justify-around items-center h-16 px-2 md:hidden pb-safe">
+<!-- Home (Active state matched contextually) -->
+<a class="flex flex-col items-center justify-center bg-secondary-container text-primary rounded-full px-4 py-1 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-caps text-label-caps mt-1">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary active:scale-90 transition-transform px-4 py-1" href="#">
+<span class="material-symbols-outlined">rebase_edit</span>
+<span class="font-label-caps text-label-caps mt-1">Services</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary active:scale-90 transition-transform px-4 py-1" href="#">
+<span class="material-symbols-outlined">groups</span>
+<span class="font-label-caps text-label-caps mt-1">Community</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary active:scale-90 transition-transform px-4 py-1 relative" href="#">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1 right-3 w-2 h-2 rounded-full bg-status-danger border-2 border-surface"></span>
+<span class="font-label-caps text-label-caps mt-1">Alerts</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary active:scale-90 transition-transform px-4 py-1" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label-caps text-label-caps mt-1">Profile</span>
+</a>
+</nav>
+</body></html>

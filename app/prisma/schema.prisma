@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  role      String
+  apartment String?
+  tower     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Visitor {
+  id        String   @id @default(cuid())
+  name      String
+  destination String
+  status    String   // "Pending Approval", "Pre-Authorized", "Entered", "Denied"
+  icon      String?
+  img       String?
+  age       Int?
+  guestCount Int     @default(1)
+  phone     String?
+  qrToken   String?  @unique
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model EmergencyEvent {
+  id        String   @id @default(cuid())
+  type      String   // "SOS", "FIRE", "MEDICAL"
+  status    String   // "ACTIVE", "RESOLVED"
+  triggeredBy String // User role/name who triggered it
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Notice {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  type      String   // "INFO", "ALERT", "EVENT"
+  author    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Complaint {
+  id        String   @id @default(cuid())
+  title     String
+  status    String   // "OPEN", "IN_PROGRESS", "RESOLVED"
+  author    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Society {
+  id        String   @id @default(cuid())
+  name      String
+  city      String
+  status    String   // "ACTIVE", "INACTIVE"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Facility {
+  id          String   @id @default(cuid())
+  name        String   // "Gym", "Swimming Pool", "Party Lawn"
+  description String
+  rate        Float    // Fixed price
+  validity    String   // "Monthly", "Daily", etc.
+  icon        String   // Material symbols icon name
+  bookings    FacilityBooking[]
+}
+
+model FacilityBooking {
+  id         String   @id @default(cuid())
+  facilityId String
+  userId     String   // E.g., "Resident (Unit 402)"
+  date       DateTime // Booking start date
+  endDate    DateTime? // Booking end date (for daily/event based)
+  status     String   // "ACTIVE", "EXPIRED", "CANCELLED"
+  facility   Facility @relation(fields: [facilityId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Invoice {
+  id          String   @id @default(cuid())
+  userId      String   // E.g., "Resident (Unit 402)"
+  title       String   // E.g., "Monthly Maintenance - September"
+  amount      Float
+  dueDate     DateTime
+  status      String   // "PENDING", "PAID", "OVERDUE"
+  paidAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model FamilyMember {
+  id          String   @id @default(cuid())
+  userId      String   // E.g., "Resident (Unit 402)"
+  name        String
+  relationship String  // E.g., "Spouse", "Child"
+  age         Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Vehicle {
+  id          String   @id @default(cuid())
+  userId      String   // E.g., "Resident (Unit 402)"
+  type        String   // "Car", "Bike"
+  makeModel   String   // E.g., "Honda Civic"
+  registration String  // E.g., "MH 12 AB 1234"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

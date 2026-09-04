@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Guard Home - Estate Pillar</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;family=Manrope:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error-container": "#93000a",
+                        "surface-subtle": "#F8FAFC",
+                        "tertiary-container": "#003d88",
+                        "on-primary": "#ffffff",
+                        "inverse-primary": "#b6c4ff",
+                        "on-tertiary-fixed": "#001a42",
+                        "status-warning": "#F59E0B",
+                        "tertiary-fixed": "#d8e2ff",
+                        "on-primary-fixed": "#00164e",
+                        "tertiary": "#00285e",
+                        "on-tertiary-container": "#82abff",
+                        "primary-container": "#1e3a8a",
+                        "secondary": "#565e74",
+                        "inverse-surface": "#213145",
+                        "status-success": "#10B981",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed": "#131b2e",
+                        "background": "#f8f9ff",
+                        "inverse-on-surface": "#eaf1ff",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "border-low": "#E2E8F0",
+                        "on-background": "#0b1c30",
+                        "surface-container-low": "#eff4ff",
+                        "on-surface-variant": "#444651",
+                        "on-secondary-container": "#5c647a",
+                        "surface-bright": "#f8f9ff",
+                        "primary": "#00236f",
+                        "primary-fixed-dim": "#b6c4ff",
+                        "on-secondary": "#ffffff",
+                        "secondary-fixed-dim": "#bec6e0",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-container": "#dae2fd",
+                        "secondary-fixed": "#dae2fd",
+                        "outline-variant": "#c5c5d3",
+                        "error": "#ba1a1a",
+                        "surface-dim": "#cbdbf5",
+                        "surface-container-high": "#dce9ff",
+                        "surface-container-highest": "#d3e4fe",
+                        "outline": "#757682",
+                        "on-secondary-fixed-variant": "#3f465c",
+                        "surface-tint": "#4059aa",
+                        "surface-variant": "#d3e4fe",
+                        "surface-container": "#e5eeff",
+                        "on-primary-container": "#90a8ff",
+                        "on-surface": "#0b1c30",
+                        "on-primary-fixed-variant": "#264191",
+                        "status-info": "#6366F1",
+                        "error-container": "#ffdad6",
+                        "primary-fixed": "#dce1ff",
+                        "surface": "#f8f9ff",
+                        "status-danger": "#EF4444",
+                        "on-error": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-sm": "12px",
+                        "container-margin-desktop": "40px",
+                        "stack-lg": "48px",
+                        "stack-md": "24px",
+                        "container-margin-mobile": "16px",
+                        "base": "8px",
+                        "gutter-grid": "24px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg-mobile": ["Manrope"],
+                        "body-sm": ["Inter"],
+                        "display-metrics": ["Manrope"],
+                        "label-caps": ["Inter"],
+                        "headline-md": ["Manrope"],
+                        "headline-lg": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "display-metrics": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-subtle text-on-surface font-body-md min-h-screen pb-20 md:pb-0">
+<!-- TopAppBar -->
+<header class="bg-surface dark:bg-surface w-full top-0 sticky z-40 shadow-sm dark:bg-surface-container">
+<div class="flex justify-between items-center px-container-margin-mobile py-4 max-w-7xl mx-auto">
+<div class="flex items-center gap-base">
+<div class="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold">
+                    MG
+                </div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">Main Gate 1</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Officer Jenkins</p>
+</div>
+</div>
+<button class="active:scale-95 transition-transform hover:bg-surface-container-low p-2 rounded-full text-primary dark:text-primary-fixed">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</div>
+</header>
+<!-- Main Content -->
+<main class="px-container-margin-mobile py-stack-md max-w-3xl mx-auto space-y-stack-md">
+<!-- Quick Actions -->
+<section class="grid grid-cols-2 gap-stack-sm">
+<button class="bg-surface rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] p-stack-sm flex flex-col items-center justify-center h-32 active:scale-95 transition-transform hover:shadow-lg border border-transparent hover:border-primary/10">
+<div class="w-12 h-12 rounded-full bg-primary-container text-primary mb-2 flex items-center justify-center">
+<span class="material-symbols-outlined text-3xl" data-icon="person_add">person_add</span>
+</div>
+<span class="font-headline-md text-headline-md text-center leading-tight">Visitor<br/>Entry</span>
+</button>
+<button class="bg-surface rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] p-stack-sm flex flex-col items-center justify-center h-32 active:scale-95 transition-transform hover:shadow-lg border border-transparent hover:border-primary/10">
+<div class="w-12 h-12 rounded-full bg-secondary-container text-primary mb-2 flex items-center justify-center">
+<span class="material-symbols-outlined text-3xl" data-icon="local_shipping">local_shipping</span>
+</div>
+<span class="font-headline-md text-headline-md text-center leading-tight">Delivery</span>
+</button>
+<button class="bg-surface rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] p-stack-sm flex flex-col items-center justify-center h-32 active:scale-95 transition-transform hover:shadow-lg border border-transparent hover:border-primary/10">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest text-primary mb-2 flex items-center justify-center">
+<span class="material-symbols-outlined text-3xl" data-icon="directions_car">directions_car</span>
+</div>
+<span class="font-headline-md text-headline-md text-center leading-tight">Vehicle<br/>Entry</span>
+</button>
+<button class="bg-error text-on-error rounded-xl shadow-lg p-stack-sm flex flex-col items-center justify-center h-32 active:scale-95 transition-transform">
+<div class="w-12 h-12 rounded-full bg-white/20 mb-2 flex items-center justify-center">
+<span class="material-symbols-outlined text-3xl" data-icon="emergency">emergency</span>
+</div>
+<span class="font-headline-md text-headline-md text-center leading-tight">Emergency</span>
+</button>
+</section>
+<!-- Visitors Waiting -->
+<section>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-stack-sm">Visitors Waiting (2)</h2>
+<div class="space-y-stack-sm">
+<!-- Waiting Card 1 -->
+<div class="bg-surface rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] p-stack-sm border-l-4 border-status-warning flex justify-between items-center">
+<div class="flex items-center gap-stack-sm">
+<div class="w-12 h-12 rounded-full bg-surface-container overflow-hidden">
+<img alt="Visitor Photo" class="w-full h-full object-cover" data-alt="A close up portrait of a middle aged man with glasses, looking neutral. Shot in a bright, modern light-mode environment with high contrast and sharp focus, typical of an ID photo." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxxTUXOqsASVXnbKSuvJk0lyEKSn8P4fsLjE1xKP7dPF1CpyhspoRZJ6qYq3c9am1ywVH2SZEMApGYqXM-hFIRPNjzMuH6a1SgE8KoHiH-amyJ5TBC-UdjYQRFBYGNNhrCNviCRhZ-bU60vZ_ASHgfCbRD8viOrQFjUErdD-WjUusz4fJQsmB7rZR6p7oDn_8JTORK8XUjjNQQhQdxTm3richirVTgMm0xS8lldvnbuyDqEWlUoGZg"/>
+</div>
+<div>
+<h3 class="font-headline-md text-body-md font-bold text-on-surface">Mark Roberts</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Visiting: Unit 402 (Estate Pillar)</p>
+<span class="inline-block mt-1 bg-status-warning/10 text-status-warning font-label-caps text-label-caps px-2 py-0.5 rounded-full">Pending Approval</span>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<button class="bg-primary text-on-primary font-body-sm text-body-sm px-4 py-2 rounded-lg font-bold active:scale-95 transition-transform h-10 w-24">Allow</button>
+<button class="bg-surface-container text-on-surface-variant font-body-sm text-body-sm px-4 py-2 rounded-lg active:scale-95 transition-transform h-10 w-24">Deny</button>
+</div>
+</div>
+<!-- Waiting Card 2 -->
+<div class="bg-surface rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] p-stack-sm border-l-4 border-status-info flex justify-between items-center">
+<div class="flex items-center gap-stack-sm">
+<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="local_shipping">local_shipping</span>
+</div>
+<div>
+<h3 class="font-headline-md text-body-md font-bold text-on-surface">Amazon Delivery</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Destination: Mailroom</p>
+<span class="inline-block mt-1 bg-status-info/10 text-status-info font-label-caps text-label-caps px-2 py-0.5 rounded-full">Pre-Authorized</span>
+</div>
+</div>
+<button class="bg-primary text-on-primary font-body-sm text-body-sm px-4 py-2 rounded-lg font-bold active:scale-95 transition-transform h-12 w-24 flex items-center justify-center">Log Entry</button>
+</div>
+</div>
+</section>
+<!-- Recent Entries -->
+<section>
+<div class="flex justify-between items-center mb-stack-sm">
+<h2 class="font-headline-md text-headline-md text-on-surface">Recent Entries</h2>
+<a class="text-primary font-body-sm text-body-sm font-semibold" href="#">View All</a>
+</div>
+<div class="bg-surface rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] divide-y divide-border-low">
+<!-- Log Item 1 -->
+<div class="p-stack-sm flex justify-between items-center">
+<div class="flex items-center gap-stack-sm">
+<span class="material-symbols-outlined text-status-success bg-status-success/10 p-2 rounded-full" data-icon="check_circle">check_circle</span>
+<div>
+<p class="font-body-md text-body-md font-semibold text-on-surface">Sarah Connor</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Unit 110 • Guest</p>
+</div>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant">10:42 AM</span>
+</div>
+<!-- Log Item 2 -->
+<div class="p-stack-sm flex justify-between items-center">
+<div class="flex items-center gap-stack-sm">
+<span class="material-symbols-outlined text-status-success bg-status-success/10 p-2 rounded-full" data-icon="check_circle">check_circle</span>
+<div>
+<p class="font-body-md text-body-md font-semibold text-on-surface">FedEx</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Delivery</p>
+</div>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant">09:15 AM</span>
+</div>
+<!-- Log Item 3 -->
+<div class="p-stack-sm flex justify-between items-center">
+<div class="flex items-center gap-stack-sm">
+<span class="material-symbols-outlined text-status-danger bg-status-danger/10 p-2 rounded-full" data-icon="cancel">cancel</span>
+<div>
+<p class="font-body-md text-body-md font-semibold text-on-surface">Unknown Vehicle</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Denied Entry</p>
+</div>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant">08:30 AM</span>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden bg-surface dark:bg-surface-container-lowest fixed bottom-0 w-full z-50 rounded-t-xl shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+<div class="flex justify-around items-center h-16 px-2">
+<button class="flex flex-col items-center justify-center bg-secondary-container dark:bg-primary-container text-primary dark:text-on-primary-container rounded-full px-4 py-1 active:scale-90 transition-transform">
+<span class="material-symbols-outlined" data-icon="home" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-caps text-label-caps mt-1">Home</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline hover:text-primary dark:hover:text-primary-fixed active:scale-90 transition-transform">
+<span class="material-symbols-outlined" data-icon="list_alt">list_alt</span>
+<span class="font-label-caps text-label-caps mt-1">Logs</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline hover:text-primary dark:hover:text-primary-fixed active:scale-90 transition-transform">
+<span class="material-symbols-outlined" data-icon="qr_code_scanner">qr_code_scanner</span>
+<span class="font-label-caps text-label-caps mt-1">Scan</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline hover:text-primary dark:hover:text-primary-fixed active:scale-90 transition-transform">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-label-caps text-label-caps mt-1">Profile</span>
+</button>
+</div>
+</nav>
+</body></html>
