@@ -6,7 +6,7 @@ import { useAudioPlayer } from 'expo-audio';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import QRCode from 'react-native-qrcode-svg';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Clipboard from 'expo-clipboard';
 
 
@@ -15,7 +15,7 @@ const API_URL = 'https://sms-backend-ivz0.onrender.com';
 
 function EmergencyListener() {
   const [activeEvent, setActiveEvent] = useState(null);
-  const player = useAudioPlayer('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+  const player = useAudioPlayer(null);
 
   useEffect(() => {
     let poller = setInterval(async () => {
@@ -39,6 +39,7 @@ function EmergencyListener() {
       try {
         Vibration.vibrate([300, 100, 300, 100, 300], true);
         if (player) {
+          player.replace({ uri: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg' });
           player.loop = true;
           player.play();
         }
