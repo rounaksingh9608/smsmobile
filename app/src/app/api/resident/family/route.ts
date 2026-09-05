@@ -11,7 +11,7 @@ export async function POST(request: Request) {
           userId: 'Resident (Unit 402)',
           name,
           relationship,
-          age: parseInt(age)
+          age: parseInt(age) || 0
         }
       });
       return NextResponse.json({ member });
