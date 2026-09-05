@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, StatusBar, Alert, ActivityIndicator, FlatList, Modal, ScrollView, Platform, Vibration, Linking, Share } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAudioPlayer } from 'expo-audio';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -99,10 +99,10 @@ export default function App() {
   }
 
   return (
-    <>
+    <SafeAreaProvider>
       {content}
       {isAuthenticated && <EmergencyListener />}
-    </>
+    </SafeAreaProvider>
   );
 }
 
