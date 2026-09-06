@@ -13,7 +13,7 @@ import { Calendar } from 'react-native-calendars';
 
 
 // IMPORTANT: Replace this with your computer's local IP address
-const API_URL = 'http://172.30.21.153:3000';
+const API_URL = 'https://sociohub-backend-0pz8.onrender.com';
 
 function EmergencyListener() {
   const [activeEvent, setActiveEvent] = useState(null);
@@ -1859,15 +1859,15 @@ function SecretaryHomeTab({ data, loadData }) {
 function SecretaryFinancesTab({ data, loadData }) {
   const allInvoices = data.users?.flatMap(u => u.invoices || []) || [];
   const expenses = data.expenses || [];
-  
+
   const totalIncoming = allInvoices.filter(i => i.status === 'PAID').reduce((acc, curr) => acc + curr.amount, 0);
   const totalOutgoing = expenses.reduce((acc, curr) => acc + curr.amount, 0);
-  
+
   const totalBalance = totalIncoming - totalOutgoing;
   const pendingDues = allInvoices.filter(i => i.status === 'PENDING').reduce((acc, curr) => acc + curr.amount, 0);
 
   // Get 10 most recent transactions (invoices and expenses)
-  const recentTransactions = [...allInvoices, ...expenses.map(e => ({...e, isExpense: true}))]
+  const recentTransactions = [...allInvoices, ...expenses.map(e => ({ ...e, isExpense: true }))]
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 10);
 
@@ -1879,7 +1879,7 @@ function SecretaryFinancesTab({ data, loadData }) {
       Alert.alert('Notice', 'Already paid for the current month');
       return;
     }
-    
+
     try {
       const token = await AsyncStorage.getItem('userToken');
       const res = await fetch(`${API_URL}/api/secretary/payroll`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
@@ -1895,8 +1895,8 @@ function SecretaryFinancesTab({ data, loadData }) {
     <ScrollView style={{ flex: 1, padding: 15 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
         <Text style={[styles.sectionTitle, { fontSize: 24, marginBottom: 0 }]}>Financial Overview</Text>
-        <TouchableOpacity 
-          onPress={runPayroll} 
+        <TouchableOpacity
+          onPress={runPayroll}
           style={{ backgroundColor: isPayrollDone ? '#94a3b8' : '#10b981', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', opacity: isPayrollDone ? 0.7 : 1 }}
         >
           <MaterialIcons name="payments" size={16} color="#fff" style={{ marginRight: 5 }} />
