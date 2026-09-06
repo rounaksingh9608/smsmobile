@@ -3,11 +3,13 @@ databases:
     databaseName: sociohub
     user: admin
     plan: free
+    region: singapore
 
 services:
   - type: web
     name: sociohub-backend
     env: node
+    region: singapore
     rootDir: app
     buildCommand: npm install && npm run build
     startCommand: npm run start
