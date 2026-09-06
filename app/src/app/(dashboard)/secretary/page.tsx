@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { logout } from '@/app/actions/auth';
 import { showToast } from '@/app/components/Toast';
-import { getComplaints, broadcastNotice, getExpectedVisitors, getUsers, createUser, deleteUser, updateComplaintStatus } from '@/app/actions/secretary';
+import { getComplaints, broadcastNotice, getExpectedVisitors, getUsers, createUser, deleteUser, updateComplaintStatus, getUserDetails } from '@/app/actions/secretary';
 
 export default function SecretaryDashboard() {
   const [activeTab, setActiveTab] = useState('home');
@@ -14,9 +14,11 @@ export default function SecretaryDashboard() {
   // Modals state
   const [isManageUsersOpen, setIsManageUsersOpen] = useState(false);
   const [newUserName, setNewUserName] = useState('');
+  const [newUserPhone, setNewUserPhone] = useState('');
   const [newUserRole, setNewUserRole] = useState('Resident');
   const [newUserApartment, setNewUserApartment] = useState('');
   const [newUserTower, setNewUserTower] = useState('');
+  const [generatedUser, setGeneratedUser] = useState<any>(null);
   
   const [isComplaintDetailsOpen, setIsComplaintDetailsOpen] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState<any>(null);
@@ -26,6 +28,10 @@ export default function SecretaryDashboard() {
   const [noticeContent, setNoticeContent] = useState('');
 
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+
+  const [isUserDetailsOpen, setIsUserDetailsOpen] = useState(false);
+  const [selectedUserDetails, setSelectedUserDetails] = useState<any>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -57,18 +63,21 @@ export default function SecretaryDashboard() {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUserName) return;
+    if (!newUserName || !newUserPhone) return;
     
     showToast('Creating user...', 'info');
-    await createUser(
+    const result = await createUser(
       newUserName, 
       newUserRole, 
+      newUserPhone,
       newUserRole === 'Resident' ? newUserApartment : undefined, 
       newUserRole === 'Resident' ? newUserTower : undefined
     );
     showToast('User created successfully!', 'success');
     
+    setGeneratedUser(result);
     setNewUserName('');
+    setNewUserPhone('');
     setNewUserApartment('');
     setNewUserTower('');
     loadData();
@@ -96,6 +105,14 @@ export default function SecretaryDashboard() {
     showToast(`Status updated to ${newStatus.replace('_', ' ')}`, 'info');
     await updateComplaintStatus(id, newStatus);
     loadData();
+  };
+
+  const handleViewUser = async (user: any) => {
+    setLoadingDetails(true);
+    setIsUserDetailsOpen(true);
+    const details = await getUserDetails(user.id);
+    setSelectedUserDetails(details || user); // fallback to user if details fail
+    setLoadingDetails(false);
   };
 
   return (
@@ -422,70 +439,229 @@ export default function SecretaryDashboard() {
             </div>
             
             <div className="overflow-y-auto p-4 flex flex-col gap-4">
-              <form onSubmit={handleCreateUser} className="bg-surface-subtle border border-border-low rounded-xl p-4">
-                <h3 className="font-headline-md font-bold text-on-surface mb-3">Add New User</h3>
-                <div className="flex flex-col gap-3">
-                  <input 
-                    type="text"
-                    value={newUserName}
-                    onChange={(e) => setNewUserName(e.target.value)}
-                    className="w-full bg-surface border border-border-low rounded-lg px-3 py-2 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="Full Name"
-                    required
-                  />
-                  <div className="flex gap-2">
-                    <select 
-                      value={newUserRole}
-                      onChange={(e) => setNewUserRole(e.target.value)}
-                      className="flex-1 bg-surface border border-border-low rounded-lg px-3 py-2 text-on-surface focus:outline-none"
-                    >
-                      <option>Resident</option>
-                      <option>Guard</option>
-                      <option>Secretary</option>
-                    </select>
-                    <button type="submit" className="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold active:scale-95">Add</button>
+              {generatedUser ? (
+                <div className="bg-surface-subtle border border-border-low rounded-xl p-6 text-center flex flex-col items-center">
+                  <div className="w-16 h-16 bg-status-success/10 text-status-success rounded-full flex items-center justify-center mb-4">
+                    <span className="material-symbols-outlined text-[32px]">check_circle</span>
                   </div>
-                  {newUserRole === 'Resident' && (
-                    <div className="flex flex-col gap-3 mt-1">
-                      <input 
-                        type="text"
-                        value={newUserApartment}
-                        onChange={(e) => setNewUserApartment(e.target.value)}
-                        className="w-full bg-surface border border-border-low rounded-lg px-3 py-2 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
-                        placeholder="Apartment (e.g. 402)"
-                        required
-                      />
-                      <input 
-                        type="text"
-                        value={newUserTower}
-                        onChange={(e) => setNewUserTower(e.target.value)}
-                        className="w-full bg-surface border border-border-low rounded-lg px-3 py-2 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
-                        placeholder="Tower/Wing (e.g. A)"
-                        required
-                      />
-                    </div>
-                  )}
+                  <h3 className="font-headline-md font-bold text-on-surface mb-2">User Registered!</h3>
+                  <div className="bg-surface p-4 rounded-lg w-full mb-4 border border-border-low text-left">
+                    <p className="font-label-caps text-xs text-on-surface-variant mb-1">LOGIN ID (OR PHONE)</p>
+                    <p className="font-body-md font-bold mb-3">{generatedUser.loginId}</p>
+                    
+                    <p className="font-label-caps text-xs text-on-surface-variant mb-1">PASSWORD</p>
+                    <p className="font-body-md font-bold">{generatedUser.password}</p>
+                  </div>
+                  
+                  <div className="flex gap-2 w-full">
+                    <a 
+                      href={`https://wa.me/${generatedUser.phone.replace(/[^0-9]/g, '')}?text=Welcome to SocioHub!%0A%0AHere are your login details:%0AApp Name: SocioHub%0ALogin ID: ${generatedUser.loginId}%0APassword: ${generatedUser.password}%0A%0APlease change your password after logging in.`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 bg-[#25D366] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                    >
+                      Share via WhatsApp
+                    </a>
+                    <button 
+                      onClick={() => setGeneratedUser(null)}
+                      className="flex-1 bg-surface-container border border-border-low font-bold py-3 rounded-xl active:scale-95 transition-transform"
+                    >
+                      Done
+                    </button>
+                  </div>
                 </div>
-              </form>
+              ) : (
+                <form onSubmit={handleCreateUser} className="bg-surface-subtle border border-border-low rounded-xl p-4">
+                  <h3 className="font-headline-md font-bold text-on-surface mb-3">Add New User</h3>
+                  <div className="flex flex-col gap-3">
+                    <input 
+                      type="text"
+                      value={newUserName}
+                      onChange={(e) => setNewUserName(e.target.value)}
+                      className="w-full bg-surface border border-border-low rounded-lg px-3 py-2 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="Full Name"
+                      required
+                    />
+                    <input 
+                      type="tel"
+                      value={newUserPhone}
+                      onChange={(e) => setNewUserPhone(e.target.value)}
+                      className="w-full bg-surface border border-border-low rounded-lg px-3 py-2 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="Phone Number"
+                      required
+                    />
+                    <div className="flex gap-2">
+                      <select 
+                        value={newUserRole}
+                        onChange={(e) => setNewUserRole(e.target.value)}
+                        className="flex-1 bg-surface border border-border-low rounded-lg px-3 py-2 text-on-surface focus:outline-none"
+                      >
+                        <option>Resident</option>
+                        <option>Guard</option>
+                        <option>Staff</option>
+                      </select>
+                      <button type="submit" className="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold active:scale-95">Add</button>
+                    </div>
+                    {newUserRole === 'Resident' && (
+                      <div className="flex flex-col gap-3 mt-1">
+                        <input 
+                          type="text"
+                          value={newUserApartment}
+                          onChange={(e) => setNewUserApartment(e.target.value)}
+                          className="w-full bg-surface border border-border-low rounded-lg px-3 py-2 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
+                          placeholder="Apartment (e.g. 402)"
+                          required
+                        />
+                        <input 
+                          type="text"
+                          value={newUserTower}
+                          onChange={(e) => setNewUserTower(e.target.value)}
+                          className="w-full bg-surface border border-border-low rounded-lg px-3 py-2 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
+                          placeholder="Tower/Wing (e.g. A)"
+                          required
+                        />
+                      </div>
+                    )}
+                  </div>
+                </form>
+              )}
 
               <div className="flex flex-col gap-2">
-                <h3 className="font-headline-md font-bold text-on-surface mt-2">Registered Users ({users.length})</h3>
+                <h3 className="font-headline-md font-bold text-on-surface mt-2">Registered Residents ({users.length})</h3>
                 {users.map(user => (
-                  <div key={user.id} className="flex justify-between items-center bg-surface border border-border-low rounded-xl p-3 shadow-sm">
+                  <div key={user.id} onClick={() => handleViewUser(user)} className="cursor-pointer flex justify-between items-center bg-surface border border-border-low rounded-xl p-3 shadow-sm hover:border-primary transition-colors">
                     <div>
                       <p className="font-body-md font-bold text-on-surface">{user.name}</p>
                       <p className="font-body-sm text-xs text-on-surface-variant">
                         {user.role} 
                         {user.role === 'Resident' && user.tower && user.apartment && ` • Tower ${user.tower}, Apt ${user.apartment}`}
                       </p>
+                      <p className="font-body-sm text-[11px] text-primary mt-1 bg-primary/5 inline-block px-2 py-0.5 rounded">
+                        ID: <span className="font-bold">{user.loginId || user.phone || 'N/A'}</span> • Pass: <span className="font-bold">{user.password || 'N/A'}</span>
+                      </p>
                     </div>
-                    <button onClick={() => handleDeleteUser(user.id)} className="text-status-danger p-2 hover:bg-status-danger/10 rounded-full active:scale-95">
-                      <span className="material-symbols-outlined text-[20px]">delete</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button onClick={(e) => { e.stopPropagation(); handleViewUser(user); }} className="text-primary p-2 hover:bg-primary/10 rounded-full active:scale-95 flex items-center gap-1 text-sm font-bold">
+                        <span className="material-symbols-outlined text-[18px]">visibility</span> View
+                      </button>
+                    </div>
                   </div>
                 ))}
-                {users.length === 0 && <p className="text-center text-on-surface-variant py-4">No users found.</p>}
+                {users.length === 0 && <p className="text-center text-on-surface-variant py-4">No residents found.</p>}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Details Modal */}
+      {isUserDetailsOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center px-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-surface w-full max-w-md rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            <div className="p-4 bg-primary text-on-primary flex justify-between items-center shrink-0">
+              <h2 className="font-headline-md text-headline-md font-bold flex items-center gap-2">
+                <span className="material-symbols-outlined">person</span> Resident Details
+              </h2>
+              <div className="flex items-center gap-2">
+                <button onClick={() => { 
+                  if (selectedUserDetails) {
+                    handleDeleteUser(selectedUserDetails.id);
+                    setIsUserDetailsOpen(false);
+                  }
+                }} className="active:scale-95 hover:bg-white/10 rounded px-2 py-1 transition-colors flex items-center gap-1 text-sm">
+                  <span className="material-symbols-outlined text-[18px]">delete</span> Delete
+                </button>
+                <button onClick={() => { setIsUserDetailsOpen(false); setSelectedUserDetails(null); }} className="active:scale-95 hover:bg-white/10 rounded-full p-1 transition-colors">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+            </div>
+            
+            <div className="overflow-y-auto p-6 flex flex-col gap-5">
+              {loadingDetails ? (
+                <div className="flex justify-center p-8"><p className="text-on-surface-variant animate-pulse">Loading details...</p></div>
+              ) : selectedUserDetails ? (
+                <>
+                  <div className="bg-secondary-container/30 p-4 rounded-xl flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-primary text-on-primary flex items-center justify-center text-2xl font-bold">
+                      {selectedUserDetails.name.charAt(0)}
+                    </div>
+                    <div>
+                      <h3 className="font-headline-lg text-headline-lg font-bold">{selectedUserDetails.name}</h3>
+                      <p className="text-on-surface-variant font-body-sm">
+                        {selectedUserDetails.role}
+                        {selectedUserDetails.role === 'Resident' && ` • Tower ${selectedUserDetails.tower}, Apt ${selectedUserDetails.apartment}`}
+                      </p>
+                      <p className="font-body-sm text-[11px] text-primary mt-1 font-bold">
+                        📞 {selectedUserDetails.phone}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Credentials Section */}
+                  <div className="bg-surface border border-primary/20 p-4 rounded-xl flex justify-between items-center">
+                    <div>
+                      <p className="text-xs text-on-surface-variant font-bold mb-1">APP LOGIN ID</p>
+                      <p className="font-headline-sm font-bold text-primary">{selectedUserDetails.loginId || selectedUserDetails.phone}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-on-surface-variant font-bold mb-1">PASSWORD</p>
+                      <p className="font-headline-sm font-bold text-on-surface">{selectedUserDetails.password}</p>
+                    </div>
+                  </div>
+
+                  {selectedUserDetails.role === 'Resident' && (
+                    <>
+                      {/* Family Members */}
+                      <div>
+                        <h4 className="font-headline-md font-bold text-on-surface mb-3 flex items-center gap-2">
+                          <span className="material-symbols-outlined text-secondary">family_home</span> 
+                          Family Members ({selectedUserDetails.familyMembers?.length || 0})
+                        </h4>
+                        {selectedUserDetails.familyMembers?.length > 0 ? (
+                          <div className="flex flex-col gap-2">
+                            {selectedUserDetails.familyMembers.map((member: any) => (
+                              <div key={member.id} className="bg-surface border border-border-low p-3 rounded-lg flex justify-between items-center">
+                                <div>
+                                  <p className="font-bold text-on-surface">{member.name}</p>
+                                  <p className="text-xs text-on-surface-variant">{member.relationship} • {member.age} yrs old</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-on-surface-variant italic">No family members registered.</p>
+                        )}
+                      </div>
+
+                      {/* Vehicles */}
+                      <div>
+                        <h4 className="font-headline-md font-bold text-on-surface mb-3 flex items-center gap-2">
+                          <span className="material-symbols-outlined text-secondary">directions_car</span> 
+                          Registered Vehicles ({selectedUserDetails.vehicles?.length || 0})
+                        </h4>
+                        {selectedUserDetails.vehicles?.length > 0 ? (
+                          <div className="flex flex-col gap-2">
+                            {selectedUserDetails.vehicles.map((vehicle: any) => (
+                              <div key={vehicle.id} className="bg-surface border border-border-low p-3 rounded-lg flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                  <span className="material-symbols-outlined text-on-surface-variant">{vehicle.type === 'Car' ? 'directions_car' : 'two_wheeler'}</span>
+                                  <div>
+                                    <p className="font-bold text-on-surface">{vehicle.registration}</p>
+                                    <p className="text-xs text-on-surface-variant">{vehicle.makeModel}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-on-surface-variant italic">No vehicles registered.</p>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : null}
             </div>
           </div>
         </div>

@@ -3,18 +3,30 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 model User {
   id        String   @id @default(cuid())
+  loginId   String?  @unique // name@flat
+  phone     String?
+  password  String?
   name      String
   role      String
+  gender    String?
   apartment String?
   tower     String?
+  societyId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  society   Society? @relation(fields: [societyId], references: [id], onDelete: Cascade)
+  familyMembers FamilyMember[]
+  vehicles      Vehicle[]
+  invoices      Invoice[]
+  bookings      FacilityBooking[]
+  expenses      Expense[]
 }
 
 model Visitor {
@@ -29,8 +41,11 @@ model Visitor {
   phone     String?
   qrToken   String?  @unique
   expiresAt DateTime?
+  societyId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  society   Society? @relation(fields: [societyId], references: [id], onDelete: Cascade)
 }
 
 model EmergencyEvent {
@@ -38,8 +53,11 @@ model EmergencyEvent {
   type      String   // "SOS", "FIRE", "MEDICAL"
   status    String   // "ACTIVE", "RESOLVED"
   triggeredBy String // User role/name who triggered it
+  societyId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  society   Society? @relation(fields: [societyId], references: [id], onDelete: Cascade)
 }
 
 model Notice {
@@ -48,8 +66,11 @@ model Notice {
   content   String
   type      String   // "INFO", "ALERT", "EVENT"
   author    String
+  societyId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  society   Society? @relation(fields: [societyId], references: [id], onDelete: Cascade)
 }
 
 model Complaint {
@@ -57,17 +78,31 @@ model Complaint {
   title     String
   status    String   // "OPEN", "IN_PROGRESS", "RESOLVED"
   author    String
+  societyId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  society   Society? @relation(fields: [societyId], references: [id], onDelete: Cascade)
 }
 
 model Society {
   id        String   @id @default(cuid())
-  name      String
-  city      String
-  status    String   // "ACTIVE", "INACTIVE"
+  name      String   @unique
+  city      String?
+  phone     String
+  email     String
+  password  String
+  status    String   @default("ACTIVE") // "ACTIVE", "INACTIVE"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  users            User[]
+  visitors         Visitor[]
+  emergencyEvents  EmergencyEvent[]
+  notices          Notice[]
+  complaints       Complaint[]
+  facilities       Facility[]
+  expenses         Expense[]
 }
 
 model Facility {
@@ -77,24 +112,29 @@ model Facility {
   rate        Float    // Fixed price
   validity    String   // "Monthly", "Daily", etc.
   icon        String   // Material symbols icon name
+  societyId   String?
+  
+  society     Society? @relation(fields: [societyId], references: [id], onDelete: Cascade)
   bookings    FacilityBooking[]
 }
 
 model FacilityBooking {
   id         String   @id @default(cuid())
   facilityId String
-  userId     String   // E.g., "Resident (Unit 402)"
+  userId     String   // Real foreign key
   date       DateTime // Booking start date
   endDate    DateTime? // Booking end date (for daily/event based)
   status     String   // "ACTIVE", "EXPIRED", "CANCELLED"
-  facility   Facility @relation(fields: [facilityId], references: [id])
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  
+  facility   Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Invoice {
   id          String   @id @default(cuid())
-  userId      String   // E.g., "Resident (Unit 402)"
+  userId      String   // Real foreign key
   title       String   // E.g., "Monthly Maintenance - September"
   amount      Float
   dueDate     DateTime
@@ -102,24 +142,43 @@ model Invoice {
   paidAt      DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model FamilyMember {
   id          String   @id @default(cuid())
-  userId      String   // E.g., "Resident (Unit 402)"
+  userId      String   // Real foreign key
   name        String
   relationship String  // E.g., "Spouse", "Child"
   age         Int
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Vehicle {
   id          String   @id @default(cuid())
-  userId      String   // E.g., "Resident (Unit 402)"
+  userId      String   // Real foreign key
   type        String   // "Car", "Bike"
   makeModel   String   // E.g., "Honda Civic"
   registration String  // E.g., "MH 12 AB 1234"
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  title       String   
+  amount      Float
+  recipientId String   
+  societyId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  recipient   User     @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  society     Society? @relation(fields: [societyId], references: [id], onDelete: Cascade)
 }

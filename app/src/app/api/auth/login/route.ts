@@ -1,33 +1,46 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/app/lib/prisma';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key';
 
 export async function POST(request: Request) {
   try {
-    const { name, role } = await request.json();
+    const body = await request.json();
+    const { societyId, identifier, password } = body;
 
-    if (!name || !role) {
-      return NextResponse.json({ error: 'Name and role are required' }, { status: 400 });
+    if (!societyId || !identifier || !password) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    let user = await prisma.user.findFirst({
-      where: { name, role }
+    const user = await prisma.user.findFirst({
+      where: {
+        societyId,
+        password,
+        OR: [
+          { phone: identifier },
+          { loginId: identifier }
+        ]
+      },
+      include: {
+        society: true
+      }
     });
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    const token = jwt.sign(
-      { id: user.id, name: user.name, role: user.role },
-      JWT_SECRET,
-      { expiresIn: '1d' }
-    );
+    return NextResponse.json({
+      token: user.id, // Mock token
+      user: {
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        societyId: user.societyId,
+        societyName: user.society?.name
+      }
+    });
 
-    return NextResponse.json({ user, token });
   } catch (error) {
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.error('Login error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

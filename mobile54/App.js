@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, StatusBar, Alert, ActivityIndicator, FlatList, Modal, ScrollView, Platform, Vibration, Linking, Share } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, StatusBar, Alert, ActivityIndicator, FlatList, Modal, ScrollView, Platform, Vibration, Linking, Share, Image, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAudioPlayer } from 'expo-audio';
@@ -8,10 +8,12 @@ import QRCode from 'react-native-qrcode-svg';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Clipboard from 'expo-clipboard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Calendar } from 'react-native-calendars';
 
 
 // IMPORTANT: Replace this with your computer's local IP address
-const API_URL = 'https://sms-backend-ivz0.onrender.com';
+const API_URL = 'http://172.30.21.153:3000';
 
 function EmergencyListener() {
   const [activeEvent, setActiveEvent] = useState(null);
@@ -84,19 +86,58 @@ function EmergencyListener() {
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentRole, setCurrentRole] = useState(null);
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const role = await AsyncStorage.getItem('userRole');
+        if (token && role) {
+          setCurrentRole(role);
+          setIsAuthenticated(true);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      setIsReady(true);
+    };
+    checkAuth();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('userToken');
+      await AsyncStorage.removeItem('userRole');
+      setIsAuthenticated(false);
+      setCurrentRole(null);
+    } catch (e) { }
+  };
+
+  if (!isReady) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc' }}>
+        <ActivityIndicator size="large" color="#0066ff" />
+      </View>
+    );
+  }
 
   let content;
   if (!isAuthenticated) {
-    content = <LoginScreen onLogin={(role) => {
-      setCurrentRole(role);
-      setIsAuthenticated(true);
+    content = <LoginScreen onLogin={async (token, role) => {
+      try {
+        await AsyncStorage.setItem('userToken', token);
+        await AsyncStorage.setItem('userRole', role.toLowerCase());
+        setCurrentRole(role.toLowerCase());
+        setIsAuthenticated(true);
+      } catch (e) { }
     }} />;
   } else if (currentRole === 'resident') {
-    content = <ResidentMainDashboard onLogout={() => setIsAuthenticated(false)} />;
+    content = <ResidentMainDashboard onLogout={handleLogout} />;
   } else if (currentRole === 'secretary') {
-    content = <SecretaryMainDashboard onLogout={() => setIsAuthenticated(false)} />;
+    content = <SecretaryMainDashboard onLogout={handleLogout} />;
   } else {
-    content = <GuardMainDashboard onLogout={() => setIsAuthenticated(false)} />;
+    content = <GuardMainDashboard onLogout={handleLogout} />;
   }
 
   return (
@@ -111,76 +152,269 @@ export default function App() {
 // 1. LOGIN SCREEN
 // ==========================================
 function LoginScreen({ onLogin }) {
-  const [email, setEmail] = useState('demo@estatepillar.com');
-  const [password, setPassword] = useState('password123');
-  const [role, setRole] = useState('resident');
+  const [societies, setSocieties] = useState([]);
+  const [societiesLoaded, setSocietiesLoaded] = useState(false);
+  const [societyId, setSocietyId] = useState('');
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    if (email && password) {
-      onLogin(role);
-    } else {
-      Alert.alert("Error", "Please enter credentials.");
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [regName, setRegName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPhone, setRegPhone] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showRegPassword, setShowRegPassword] = useState(false);
+
+  const [showSocietyDropdown, setShowSocietyDropdown] = useState(false);
+  const [searchSocietyQuery, setSearchSocietyQuery] = useState('');
+
+  const filteredSocieties = societies.filter(s => s.name.toLowerCase().includes(searchSocietyQuery.toLowerCase()));
+
+  useEffect(() => {
+    const fetchSocieties = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/auth/societies`);
+        if (res.ok) {
+          const data = await res.json();
+          setSocieties(data);
+          if (data.length > 0) setSocietyId(data[0].id);
+        } else {
+          console.error("Failed to fetch societies: status", res.status);
+        }
+      } catch (e) {
+        console.error("Failed to fetch societies", e);
+      } finally {
+        setSocietiesLoaded(true);
+      }
+    };
+    fetchSocieties();
+  }, []);
+
+  const handleRegister = async () => {
+    if (!regName || !regEmail || !regPhone || !regPassword) {
+      Alert.alert('Error', 'Please fill in all fields.');
+      return;
     }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/auth/register-society`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: regName, email: regEmail, phone: regPhone, password: regPassword })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        Alert.alert('Success', 'Society registered! You can now log in.');
+        setIsRegistering(false);
+        // Refresh societies
+        setSocietiesLoaded(false);
+        const sRes = await fetch(`${API_URL}/api/auth/societies`);
+        if (sRes.ok) {
+          const sData = await sRes.json();
+          setSocieties(sData);
+          if (sData.length > 0) setSocietyId(sData[sData.length - 1].id);
+        }
+        setSocietiesLoaded(true);
+      } else {
+        Alert.alert('Error', data.error || 'Registration failed');
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Network error. Make sure your API_URL is correct.');
+    }
+    setLoading(false);
+  };
+
+  const handleLogin = async () => {
+    if (!societyId || !identifier || !password) {
+      Alert.alert("Error", "Please fill in all fields.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ societyId, identifier, password })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        onLogin(data.token, data.user.role);
+      } else {
+        Alert.alert("Error", data.error || "Login failed");
+      }
+    } catch (e) {
+      Alert.alert("Error", "Network request failed. Ensure API_URL points to your local machine IP (e.g. http://192.168.x.x:3000) not the production render URL.");
+    }
+    setLoading(false);
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      <View style={styles.loginContainer}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" />
+        <Image
+          source={require('./assets/image.png')}
+          style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0.4, resizeMode: 'cover' }}
+        />
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
+          <View style={styles.loginContainer}>
 
-        <View style={{ alignItems: 'center', marginBottom: 20 }}>
-          <View style={{ width: 64, height: 64, backgroundColor: '#0ea5e9', borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 15 }}>
-            <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>EP</Text>
+            <View style={{ alignItems: 'center', marginBottom: 20 }}>
+              <View style={{ width: 80, height: 80, backgroundColor: '#0066ff', borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 15, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 }}>
+                <Image source={require('./assets/icon.jpg')} style={{ width: '100%', height: '100%', resizeMode: 'cover' }} />
+              </View>
+              <Text style={styles.logoText}>SocioHub</Text>
+              <Text style={styles.subtitleText}>{isRegistering ? "Register your Society" : "Sign in to your account"}</Text>
+            </View>
+
+            {isRegistering ? (
+              <>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Society Name</Text>
+                  <TextInput style={styles.input} placeholder="e.g. Green Valley" placeholderTextColor="#888" value={regName} onChangeText={setRegName} />
+                </View>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Email Address</Text>
+                  <TextInput style={styles.input} placeholder="admin@society.com" placeholderTextColor="#888" value={regEmail} onChangeText={setRegEmail} autoCapitalize="none" keyboardType="email-address" />
+                </View>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Phone Number</Text>
+                  <TextInput style={styles.input} placeholder="1234567890" placeholderTextColor="#888" value={regPhone} onChangeText={setRegPhone} keyboardType="phone-pad" />
+                </View>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Password</Text>
+                  <View>
+                    <TextInput style={styles.input} placeholder="••••••••" placeholderTextColor="#888" value={regPassword} onChangeText={setRegPassword} secureTextEntry={!showRegPassword} />
+                    <TouchableOpacity onPress={() => setShowRegPassword(!showRegPassword)} style={{ position: 'absolute', right: 15, top: 13 }}>
+                      <MaterialIcons name={showRegPassword ? "visibility-off" : "visibility"} size={24} color="#888" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <TouchableOpacity style={styles.buttonPrimary} onPress={handleRegister} disabled={loading}>
+                  {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Register Society</Text>}
+                </TouchableOpacity>
+
+                <View style={{ marginTop: 25, alignItems: 'center' }}>
+                  <Text style={{ color: '#888', marginBottom: 5 }}>Already have a society?</Text>
+                  <TouchableOpacity onPress={() => setIsRegistering(false)}>
+                    <Text style={{ color: '#0066ff', fontWeight: 'bold', fontSize: 16 }}>Sign In here</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={styles.label}>Select Your Society</Text>
+                <TouchableOpacity
+                  style={[styles.input, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }]}
+                  onPress={() => setShowSocietyDropdown(true)}
+                  disabled={!societiesLoaded || societies.length === 0}
+                >
+                  <Text style={{ color: societyId ? '#fff' : '#888', fontSize: 16 }}>
+                    {!societiesLoaded
+                      ? 'Loading societies...'
+                      : societies.length === 0
+                        ? 'No societies found'
+                        : societyId
+                          ? societies.find(s => s.id === societyId)?.name
+                          : 'Tap to select your society'}
+                  </Text>
+                  <MaterialIcons name="arrow-drop-down" size={24} color="#888" />
+                </TouchableOpacity>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Phone Number or ID</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="1234567890 or john@402"
+                    placeholderTextColor="#888"
+                    value={identifier}
+                    onChangeText={setIdentifier}
+                    autoCapitalize="none"
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Password</Text>
+                  <View>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="••••••••"
+                      placeholderTextColor="#888"
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry={!showPassword}
+                    />
+                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: 15, top: 13 }}>
+                      <MaterialIcons name={showPassword ? "visibility-off" : "visibility"} size={24} color="#888" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <TouchableOpacity style={styles.buttonPrimary} onPress={handleLogin} disabled={loading || societies.length === 0}>
+                  {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign In</Text>}
+                </TouchableOpacity>
+
+                <View style={{ marginTop: 25, alignItems: 'center' }}>
+                  <Text style={{ color: '#888', marginBottom: 5 }}>Don't have a society yet?</Text>
+                  <TouchableOpacity onPress={() => setIsRegistering(true)}>
+                    <Text style={{ color: '#0066ff', fontWeight: 'bold', fontSize: 16 }}>Register your Society</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
-          <Text style={styles.logoText}>Estate Pillar</Text>
-          <Text style={styles.subtitleText}>Sign in to your account</Text>
-        </View>
+        </ScrollView>
 
-        <Text style={styles.label}>Select Your Role</Text>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
-          {['resident', 'guard', 'secretary'].map((r) => (
-            <TouchableOpacity
-              key={r}
-              style={[styles.roleBtn, role === r && styles.roleBtnActive]}
-              onPress={() => setRole(r)}
-            >
-              <Text style={[styles.roleBtnText, role === r && styles.roleBtnTextActive]}>
-                {r.charAt(0).toUpperCase() + r.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {/* Society Search Dropdown Modal */}
+        <Modal visible={showSocietyDropdown} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { height: '50%', width: '90%' }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Society</Text>
+                <TouchableOpacity onPress={() => setShowSocietyDropdown(false)}>
+                  <MaterialIcons name="close" size={24} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              <View style={{ padding: 20, flex: 1 }}>
+                <TextInput
+                  style={[styles.textInput, { marginBottom: 15, backgroundColor: '#f1f5f9', color: '#000' }]}
+                  placeholder="Search societies..."
+                  placeholderTextColor="#888"
+                  value={searchSocietyQuery}
+                  onChangeText={setSearchSocietyQuery}
+                  autoFocus
+                />
+                <ScrollView>
+                  {filteredSocieties.length === 0 ? <Text style={{ color: '#64748b', textAlign: 'center', marginTop: 20 }}>No societies found</Text> : null}
+                  {filteredSocieties.map(s => (
+                    <TouchableOpacity
+                      key={s.id}
+                      style={{ padding: 15, borderBottomWidth: 1, borderColor: '#f1f5f9', backgroundColor: societyId === s.id ? '#e0f2fe' : '#fff' }}
+                      onPress={() => {
+                        setSocietyId(s.id);
+                        setShowSocietyDropdown(false);
+                        setSearchSocietyQuery('');
+                      }}
+                    >
+                      <Text style={{ fontSize: 16, fontWeight: societyId === s.id ? 'bold' : 'normal', color: societyId === s.id ? '#0284c7' : '#1e293b' }}>{s.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                  <View style={{ height: 20 }} />
+                </ScrollView>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Email address</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="demo@estatepillar.com"
-            placeholderTextColor="#888"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="password123"
-            placeholderTextColor="#888"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-        </View>
-
-        <TouchableOpacity style={styles.buttonPrimary} onPress={handleLogin}>
-          <Text style={styles.buttonText}>Sign In</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -194,7 +428,8 @@ function ResidentMainDashboard({ onLogout }) {
 
   const loadData = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/resident/data`);
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await fetch(`${API_URL}/api/resident/data`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (res.ok) {
         const d = await res.json();
         setData(d);
@@ -211,21 +446,18 @@ function ResidentMainDashboard({ onLogout }) {
       <View style={[styles.topHeader, { backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#f1f5f9', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <View style={[styles.avatarBubble, { backgroundColor: '#e0e7ff' }]}>
-            <Text style={{ color: '#3730a3', fontWeight: 'bold' }}>R</Text>
+            <Text style={{ color: '#3730a3', fontWeight: 'bold' }}>{data.user?.name ? data.user.name.charAt(0).toUpperCase() : 'R'}</Text>
           </View>
           <View>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1e40af' }}>Estate Pillar</Text>
-            <Text style={{ fontSize: 12, color: '#64748b' }}>🟢 Unit 402</Text>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1e40af' }}>{data.user?.name || 'SocioHub'}</Text>
+            <Text style={{ fontSize: 12, color: '#64748b' }}>🟢 Tower {data.user?.tower}, Apt {data.user?.apartment}</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={onLogout} style={{ padding: 4, borderRadius: 20 }}>
-          <MaterialIcons name="logout" size={24} color="#ef4444" />
-        </TouchableOpacity>
       </View>
 
       <View style={styles.contentArea}>
         {loading ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator size="large" color="#0ea5e9" /></View>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator size="large" color="#0066ff" /></View>
         ) : (
           <>
             {activeTab === 'home' && <ResidentHomeTab data={data} loadData={loadData} />}
@@ -249,6 +481,8 @@ function ResidentMainDashboard({ onLogout }) {
 function ResidentHomeTab({ data, loadData }) {
   const [modalVisible, setModalVisible] = useState(null);
   const [form, setForm] = useState({});
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [generatedQr, setGeneratedQr] = useState(null);
   const qrRef = useRef();
 
@@ -284,7 +518,8 @@ function ResidentHomeTab({ data, loadData }) {
 
   const handleInvite = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/resident/invite`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await fetch(`${API_URL}/api/resident/invite`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(form) });
       const d = await res.json();
       setGeneratedQr(d.qrToken);
     } catch (e) { }
@@ -292,15 +527,28 @@ function ResidentHomeTab({ data, loadData }) {
 
   const handleComplaint = async () => {
     try {
-      await fetch(`${API_URL}/api/resident/complaints`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      const token = await AsyncStorage.getItem('userToken');
+      await fetch(`${API_URL}/api/resident/complaints`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(form) });
       Alert.alert("Success", "Complaint raised!");
       setModalVisible(null); setForm({}); loadData();
     } catch (e) { }
   };
 
+  const getBookingTotal = () => {
+    if (!form.facilityObj) return 0;
+    let total = form.facilityObj.rate;
+    if (form.date && form.endDate && form.facilityObj.validity === 'Daily') {
+      const diffTime = Math.abs(new Date(form.endDate).getTime() - new Date(form.date).getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      if (diffDays > 0) total = total * diffDays;
+    }
+    return total;
+  };
+
   const handleBook = async () => {
     try {
-      await fetch(`${API_URL}/api/resident/bookings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      const token = await AsyncStorage.getItem('userToken');
+      await fetch(`${API_URL}/api/resident/bookings`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(form) });
       Alert.alert("Success", "Facility Booked!");
       setModalVisible(null); setForm({}); loadData();
     } catch (e) { }
@@ -323,8 +571,8 @@ function ResidentHomeTab({ data, loadData }) {
   return (
     <ScrollView style={{ flex: 1, padding: 15 }}>
       {/* Banner */}
-      <View style={{ backgroundColor: '#0ea5e9', borderRadius: 20, padding: 20, marginBottom: 20 }}>
-        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#fff', marginBottom: 5 }}>Hi, Ritesh</Text>
+      <View style={{ backgroundColor: '#0066ff', borderRadius: 20, padding: 20, marginBottom: 20 }}>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#fff', marginBottom: 5 }}>Hi, {data.user?.name ? data.user.name.split(' ')[0] : 'Resident'}</Text>
         <Text style={{ color: 'rgba(255,255,255,0.8)', marginBottom: 15 }}>You have {data.invoices.filter(i => i.status === 'PENDING').length} pending payment(s)</Text>
         <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10, padding: 15, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <View>
@@ -332,7 +580,7 @@ function ResidentHomeTab({ data, loadData }) {
             <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>${pendingDues.toFixed(2)}</Text>
           </View>
           <TouchableOpacity onPress={() => {/* In App.js we can't easily switch tab from child component without passing a prop, but let's mock it for now */ Alert.alert('Notice', 'Go to Payments tab to pay.') }} style={{ backgroundColor: '#fff', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 8 }}>
-            <Text style={{ color: '#0ea5e9', fontWeight: 'bold' }}>Pay Now</Text>
+            <Text style={{ color: '#0066ff', fontWeight: 'bold' }}>Pay Now</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -365,7 +613,7 @@ function ResidentHomeTab({ data, loadData }) {
               <View key={b.id} style={{ backgroundColor: '#fff', padding: 15, borderRadius: 12, marginRight: 15, width: 220, borderWidth: 1, borderColor: '#e2e8f0' }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, alignItems: 'center' }}>
                   <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#e0f2fe', alignItems: 'center', justifyContent: 'center' }}>
-                    <MaterialIcons name={b.facility.icon.replace(/_/g, '-')} size={16} color="#0ea5e9" />
+                    <MaterialIcons name={b.facility?.icon ? b.facility.icon.replace(/_/g, '-') : 'pool'} size={16} color="#0066ff" />
                   </View>
                   <Text style={{ fontSize: 10, color: '#16a34a', fontWeight: 'bold', backgroundColor: '#dcfce7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, overflow: 'hidden' }}>{b.status}</Text>
                 </View>
@@ -379,7 +627,7 @@ function ResidentHomeTab({ data, loadData }) {
 
       <Text style={styles.sectionTitle}>Recent Activity</Text>
       {data.notices.length === 0 ? <Text style={{ color: '#94a3b8' }}>No recent activity.</Text> : data.notices.slice(0, 3).map(n => (
-        <View key={n.id} style={{ backgroundColor: '#fff', padding: 15, borderRadius: 10, marginBottom: 10, borderLeftWidth: 4, borderLeftColor: '#0ea5e9' }}>
+        <View key={n.id} style={{ backgroundColor: '#fff', padding: 15, borderRadius: 10, marginBottom: 10, borderLeftWidth: 4, borderLeftColor: '#0066ff' }}>
           <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#1e293b' }}>{n.title}</Text>
           <Text style={{ color: '#64748b', marginVertical: 5 }}>{n.content}</Text>
         </View>
@@ -442,23 +690,29 @@ function ResidentHomeTab({ data, loadData }) {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}><Text style={styles.modalTitle}>Book Facility</Text><TouchableOpacity onPress={() => setModalVisible(null)}><MaterialIcons name="close" size={24} color="#fff" /></TouchableOpacity></View>
             <ScrollView style={{ padding: 20, maxHeight: 400 }}>
-              {!form.facilityId ? data.facilities.map(f => (
-                <TouchableOpacity key={f.id} style={{ backgroundColor: '#f8fafc', padding: 15, borderRadius: 10, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' }} onPress={() => setForm({ ...form, facilityId: f.id, facilityObj: f })}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#e0f2fe', alignItems: 'center', justifyContent: 'center', marginRight: 15 }}>
-                      <MaterialIcons name={f.icon ? f.icon.replace(/_/g, '-') : 'pool'} size={24} color="#0ea5e9" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#1e293b' }}>{f.name}</Text>
-                      <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{f.description}</Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ color: '#0ea5e9', fontWeight: 'bold', fontSize: 18 }}>${f.rate}</Text>
-                      <Text style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase' }}>per {f.validity}</Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              )) : (
+              {!form.facilityId ? (
+                data.facilities && data.facilities.length > 0 ? (
+                  data.facilities.map(f => (
+                    <TouchableOpacity key={f.id} style={{ backgroundColor: '#f8fafc', padding: 15, borderRadius: 10, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' }} onPress={() => setForm({ ...form, facilityId: f.id, facilityObj: f })}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#e0f2fe', alignItems: 'center', justifyContent: 'center', marginRight: 15 }}>
+                          <MaterialIcons name={f.icon ? f.icon.replace(/_/g, '-') : 'pool'} size={24} color="#0066ff" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#1e293b' }}>{f.name}</Text>
+                          <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{f.description}</Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={{ color: '#0066ff', fontWeight: 'bold', fontSize: 18 }}>${f.rate}</Text>
+                          <Text style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase' }}>per {f.validity}</Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <Text style={{ textAlign: 'center', color: '#64748b', padding: 20 }}>No facilities available for booking.</Text>
+                )
+              ) : (
                 <>
                   <View style={{ backgroundColor: '#e0f2fe', padding: 20, borderRadius: 12, alignItems: 'center', marginBottom: 20, borderWidth: 1, borderColor: '#bae6fd' }}>
                     <MaterialIcons name={form.facilityObj?.icon ? form.facilityObj.icon.replace(/_/g, '-') : 'pool'} size={40} color="#0284c7" style={{ marginBottom: 10 }} />
@@ -466,19 +720,51 @@ function ResidentHomeTab({ data, loadData }) {
                     <Text style={{ fontSize: 14, color: '#0284c7', fontWeight: 'bold', marginTop: 5 }}>${form.facilityObj?.rate} / {form.facilityObj?.validity}</Text>
                   </View>
 
-                  <Text style={styles.inputLabel}>Start Date (YYYY-MM-DD)</Text>
-                  <TextInput style={styles.textInput} onChangeText={t => setForm({ ...form, date: t })} placeholder="2026-09-03" />
+                  <Text style={styles.inputLabel}>Start Date</Text>
+                  <TouchableOpacity onPress={() => setShowDatePicker(true)} style={[styles.textInput, { justifyContent: 'center' }]}>
+                    <Text style={{ color: form.date ? '#1e293b' : '#94a3b8' }}>{form.date ? new Date(form.date).toLocaleDateString() : 'Select Start Date'}</Text>
+                  </TouchableOpacity>
+                  {showDatePicker && (
+                    <View style={{ backgroundColor: '#fff', borderRadius: 10, marginTop: 10, overflow: 'hidden' }}>
+                      <Calendar
+                        minDate={new Date().toISOString().split('T')[0]}
+                        onDayPress={day => {
+                          setShowDatePicker(false);
+                          setForm({ ...form, date: day.dateString });
+                        }}
+                        markedDates={{
+                          [form.date ? form.date.split('T')[0] : '']: { selected: true, selectedColor: '#0ea5e9' }
+                        }}
+                      />
+                    </View>
+                  )}
 
                   {form.facilityObj?.validity === 'Daily' && (
                     <>
-                      <Text style={styles.inputLabel}>End Date (YYYY-MM-DD)</Text>
-                      <TextInput style={styles.textInput} onChangeText={t => setForm({ ...form, endDate: t })} placeholder="2026-09-04" />
+                      <Text style={styles.inputLabel}>End Date</Text>
+                      <TouchableOpacity onPress={() => setShowEndDatePicker(true)} style={[styles.textInput, { justifyContent: 'center' }]}>
+                        <Text style={{ color: form.endDate ? '#1e293b' : '#94a3b8' }}>{form.endDate ? new Date(form.endDate).toLocaleDateString() : 'Select End Date'}</Text>
+                      </TouchableOpacity>
+                      {showEndDatePicker && (
+                        <View style={{ backgroundColor: '#fff', borderRadius: 10, marginTop: 10, overflow: 'hidden' }}>
+                          <Calendar
+                            minDate={form.date || new Date().toISOString().split('T')[0]}
+                            onDayPress={day => {
+                              setShowEndDatePicker(false);
+                              setForm({ ...form, endDate: day.dateString });
+                            }}
+                            markedDates={{
+                              [form.endDate ? form.endDate.split('T')[0] : '']: { selected: true, selectedColor: '#0ea5e9' }
+                            }}
+                          />
+                        </View>
+                      )}
                     </>
                   )}
 
                   <TouchableOpacity style={[styles.buttonPrimary, { marginTop: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }]} onPress={handleBook}>
                     <MaterialIcons name="payments" size={20} color="#fff" style={{ marginRight: 8 }} />
-                    <Text style={styles.buttonText}>Pay & Confirm</Text>
+                    <Text style={styles.buttonText}>Pay ${getBookingTotal()} & Confirm</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={{ marginTop: 15, alignItems: 'center' }} onPress={() => setForm({})}><Text style={{ color: '#64748b', fontWeight: 'bold' }}>Back to Facilities</Text></TouchableOpacity>
                 </>
@@ -509,7 +795,7 @@ function ResidentComplaintsTab({ complaints, loadData }) {
         <Text style={styles.sectionTitle}>My Complaints</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <TouchableOpacity onPress={loadData} style={{ marginRight: 15 }}><MaterialIcons name="refresh" size={24} color="#64748b" /></TouchableOpacity>
-          <TouchableOpacity onPress={() => setModalVisible(true)} style={{ backgroundColor: '#0ea5e9', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 8 }}>
+          <TouchableOpacity onPress={() => setModalVisible(true)} style={{ backgroundColor: '#0066ff', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 8 }}>
             <Text style={{ color: '#fff', fontWeight: 'bold' }}>Raise Issue</Text>
           </TouchableOpacity>
         </View>
@@ -526,7 +812,7 @@ function ResidentComplaintsTab({ complaints, loadData }) {
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
             <View style={{ backgroundColor: '#fff', padding: 15, borderRadius: 10, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                 <Text style={{ fontWeight: 'bold', color: '#1e293b', flex: 1, fontSize: 16 }} numberOfLines={2} ellipsizeMode="tail">{item.title}</Text>
                 <View style={{ backgroundColor: item.status === 'OPEN' ? '#fef3c7' : item.status === 'IN_PROGRESS' ? '#e0f2fe' : '#dcfce7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginLeft: 10, borderWidth: 1, borderColor: item.status === 'OPEN' ? '#fde68a' : item.status === 'IN_PROGRESS' ? '#bae6fd' : '#bbf7d0' }}>
                   <Text style={{ fontSize: 10, fontWeight: 'bold', color: item.status === 'OPEN' ? '#d97706' : item.status === 'IN_PROGRESS' ? '#0369a1' : '#15803d' }}>{item.status}</Text>
@@ -567,8 +853,14 @@ function ResidentPaymentsTab({ invoices, loadData }) {
     } catch (e) { }
   };
 
+  const totalMaintenance = invoices.filter(i => i.status === 'PENDING').reduce((acc, curr) => acc + curr.amount, 0);
+
   return (
     <View style={{ flex: 1, padding: 15 }}>
+      <View style={{ backgroundColor: '#0ea5e9', padding: 20, borderRadius: 12, marginBottom: 20, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 }}>
+        <Text style={{ color: '#e0f2fe', fontSize: 12, fontWeight: 'bold' }}>TOTAL MAINTENANCE BALANCE</Text>
+        <Text style={{ color: '#fff', fontSize: 32, fontWeight: 'bold', marginVertical: 5 }}>${totalMaintenance.toFixed(2)}</Text>
+      </View>
       <Text style={styles.sectionTitle}>Pending Dues</Text>
       <FlatList
         data={invoices.filter(i => i.status === 'PENDING')}
@@ -609,19 +901,50 @@ function ResidentPaymentsTab({ invoices, loadData }) {
 function ResidentProfileTab({ data, onLogout, loadData }) {
   const [modalVisible, setModalVisible] = useState(null);
   const [form, setForm] = useState({});
-  const [profile, setProfile] = useState({ name: 'Ritesh', email: 'ritesh@example.com', phone: '+1 (555) 123-4567' });
+  const [profile, setProfile] = useState({ name: data.user?.name || '', phone: data.user?.phone || '', gender: data.user?.gender || 'Male' });
   const [privacy, setPrivacy] = useState({ password: '', confirm: '' });
+
+  const handleUpdateProfile = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await fetch(`${API_URL}/api/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(profile) });
+      Alert.alert("Success", "Profile updated");
+      setModalVisible(null);
+      loadData();
+    } catch (e) { }
+  };
+
+  const handleUpdatePrivacy = async () => {
+    if (privacy.password !== privacy.confirm) return Alert.alert("Error", "Passwords do not match");
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await fetch(`${API_URL}/api/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ password: privacy.password }) });
+      Alert.alert("Success", "Security settings updated");
+      setModalVisible(null);
+      setPrivacy({ password: '', confirm: '' });
+    } catch (e) { }
+  };
 
   const handleFamily = async (action, id = null) => {
     try {
-      await fetch(`${API_URL}/api/resident/family`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, id, ...form }) });
+      const token = await AsyncStorage.getItem('userToken');
+      await fetch(`${API_URL}/api/resident/family`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ action, id, ...form })
+      });
       setModalVisible(null); setForm({}); loadData();
     } catch (e) { }
   };
 
   const handleVehicle = async (action, id = null) => {
     try {
-      await fetch(`${API_URL}/api/resident/vehicles`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, id, ...form }) });
+      const token = await AsyncStorage.getItem('userToken');
+      await fetch(`${API_URL}/api/resident/vehicles`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ action, id, ...form })
+      });
       setModalVisible(null); setForm({}); loadData();
     } catch (e) { }
   };
@@ -632,10 +955,10 @@ function ResidentProfileTab({ data, onLogout, loadData }) {
         <View style={{ height: 80, backgroundColor: '#e0e7ff' }}></View>
         <View style={{ padding: 20, paddingTop: 40, alignItems: 'center' }}>
           <View style={{ position: 'absolute', top: -30, width: 60, height: 60, borderRadius: 30, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff', shadowColor: '#000', shadowOpacity: 0.1 }}>
-            <Text style={{ fontSize: 30 }}>👨‍💼</Text>
+            <Text style={{ fontSize: 30 }}>{data?.user?.gender?.toLowerCase() === 'female' ? '👩‍💼' : '👨‍💼'}</Text>
           </View>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#1e293b' }}>{profile.name}</Text>
-          <Text style={{ color: '#64748b', marginBottom: 20 }}>Resident • Unit 402</Text>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#1e293b' }}>{data.user?.name || profile.name}</Text>
+          <Text style={{ color: '#64748b', marginBottom: 20 }}>Resident • Tower {data.user?.tower}, Apt {data.user?.apartment}</Text>
 
           <View style={{ width: '100%', borderTopWidth: 1, borderColor: '#f1f5f9', paddingTop: 15, paddingBottom: 15, borderBottomWidth: 1 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -684,8 +1007,12 @@ function ResidentProfileTab({ data, onLogout, loadData }) {
         <MaterialIcons name="chevron-right" size={24} color="#64748b" />
       </TouchableOpacity>
 
-      <View style={{ height: 50 }} />
+      <TouchableOpacity onPress={onLogout} style={{ marginTop: 10, padding: 15, backgroundColor: '#fee2e2', borderRadius: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}>
+        <MaterialIcons name="logout" size={20} color="#ef4444" style={{ marginRight: 8 }} />
+        <Text style={{ color: '#ef4444', fontWeight: 'bold' }}>Logout</Text>
+      </TouchableOpacity>
 
+      <View style={{ height: 50 }} />
       {/* Add Family Modal */}
       <Modal visible={modalVisible === 'addFamily'} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -696,6 +1023,8 @@ function ResidentProfileTab({ data, onLogout, loadData }) {
               <TextInput style={styles.textInput} onChangeText={t => setForm({ ...form, name: t })} />
               <Text style={styles.inputLabel}>Relationship</Text>
               <TextInput style={styles.textInput} onChangeText={t => setForm({ ...form, relationship: t })} />
+              <Text style={styles.inputLabel}>Age</Text>
+              <TextInput style={styles.textInput} keyboardType="numeric" onChangeText={t => setForm({ ...form, age: t })} />
               <TouchableOpacity style={[styles.buttonPrimary, { marginTop: 20 }]} onPress={() => handleFamily('add')}><Text style={styles.buttonText}>Add Member</Text></TouchableOpacity>
             </View>
           </View>
@@ -710,11 +1039,14 @@ function ResidentProfileTab({ data, onLogout, loadData }) {
             <View style={{ padding: 20 }}>
               <Text style={styles.inputLabel}>Full Name</Text>
               <TextInput style={styles.textInput} value={profile.name} onChangeText={t => setProfile({ ...profile, name: t })} />
-              <Text style={styles.inputLabel}>Email Address</Text>
-              <TextInput style={styles.textInput} value={profile.email} onChangeText={t => setProfile({ ...profile, email: t })} />
               <Text style={styles.inputLabel}>Phone Number</Text>
               <TextInput style={styles.textInput} value={profile.phone} onChangeText={t => setProfile({ ...profile, phone: t })} />
-              <TouchableOpacity style={[styles.buttonPrimary, { marginTop: 20 }]} onPress={() => { Alert.alert("Success", "Profile updated"); setModalVisible(null); }}><Text style={styles.buttonText}>Save Changes</Text></TouchableOpacity>
+              <Text style={styles.inputLabel}>Gender</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                <TouchableOpacity style={[styles.roleBtn, profile.gender === 'Male' && styles.roleBtnActive]} onPress={() => setProfile({ ...profile, gender: 'Male' })}><Text style={[styles.roleBtnText, profile.gender === 'Male' && styles.roleBtnTextActive]}>Male</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.roleBtn, profile.gender === 'Female' && styles.roleBtnActive]} onPress={() => setProfile({ ...profile, gender: 'Female' })}><Text style={[styles.roleBtnText, profile.gender === 'Female' && styles.roleBtnTextActive]}>Female</Text></TouchableOpacity>
+              </View>
+              <TouchableOpacity style={[styles.buttonPrimary, { marginTop: 20 }]} onPress={handleUpdateProfile}><Text style={styles.buttonText}>Save Changes</Text></TouchableOpacity>
             </View>
           </View>
         </View>
@@ -730,16 +1062,12 @@ function ResidentProfileTab({ data, onLogout, loadData }) {
               <TextInput style={styles.textInput} secureTextEntry placeholder="New Password" value={privacy.password} onChangeText={t => setPrivacy({ ...privacy, password: t })} />
               <Text style={styles.inputLabel}>Confirm Password</Text>
               <TextInput style={styles.textInput} secureTextEntry placeholder="Confirm New Password" value={privacy.confirm} onChangeText={t => setPrivacy({ ...privacy, confirm: t })} />
-              <TouchableOpacity style={[styles.buttonPrimary, { marginTop: 20 }]} onPress={() => { Alert.alert("Success", "Security settings updated"); setModalVisible(null); setPrivacy({ password: '', confirm: '' }); }}><Text style={styles.buttonText}>Save Changes</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.buttonPrimary, { marginTop: 20 }]} onPress={handleUpdatePrivacy}><Text style={styles.buttonText}>Save Changes</Text></TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      <TouchableOpacity onPress={onLogout} style={{ marginTop: 20, padding: 15, backgroundColor: '#fee2e2', borderRadius: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}>
-        <MaterialIcons name="logout" size={20} color="#ef4444" style={{ marginRight: 8 }} />
-        <Text style={{ color: '#ef4444', fontWeight: 'bold' }}>Logout</Text>
-      </TouchableOpacity>
 
       {/* Add Vehicle Modal */}
       <Modal visible={modalVisible === 'addVehicle'} transparent animationType="slide">
@@ -767,19 +1095,35 @@ function ResidentProfileTab({ data, onLogout, loadData }) {
 // ==========================================
 function GuardMainDashboard({ onLogout }) {
   const [activeTab, setActiveTab] = useState('home');
+  const [data, setData] = useState({ user: null, society: null });
+
+  const loadData = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await fetch(`${API_URL}/api/profile`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (res.ok) {
+        const d = await res.json();
+        setData(d);
+      }
+    } catch (e) { }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   return (
     <SafeAreaView style={styles.mainContainer}>
       <StatusBar barStyle="light-content" backgroundColor="#e8eefc" />
 
-      <View style={styles.topHeader}>
+      <View style={[styles.topHeader, { backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#f1f5f9', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={styles.avatarBubble}>
-            <Text style={styles.avatarText}>MG</Text>
+          <View style={[styles.avatarBubble, { backgroundColor: '#e0f2fe' }]}>
+            <Text style={{ color: '#0369a1', fontWeight: 'bold' }}>{data.user?.name ? data.user.name.charAt(0).toUpperCase() : 'G'}</Text>
           </View>
           <View>
-            <Text style={styles.headerGateText}>Main Gate 1</Text>
-            <Text style={styles.headerOfficerText}>Officer Jenkins</Text>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#0f172a' }}>{data.user?.name || 'Security Guard'}</Text>
+            <Text style={{ fontSize: 12, color: '#64748b' }}>{data.society?.name || 'Loading Society...'}</Text>
           </View>
         </View>
       </View>
@@ -788,7 +1132,7 @@ function GuardMainDashboard({ onLogout }) {
         {activeTab === 'home' && <HomeTab />}
         {activeTab === 'logs' && <LogsTab />}
         {activeTab === 'scan' && <ScanTab />}
-        {activeTab === 'profile' && <ProfileTab onLogout={onLogout} />}
+        {activeTab === 'profile' && <ProfileTab onLogout={onLogout} data={data} loadData={loadData} />}
       </View>
 
       <View style={styles.bottomNav}>
@@ -1068,10 +1412,35 @@ function ScanTab() {
   );
 }
 
-function ProfileTab({ onLogout }) {
+function ProfileTab({ onLogout, data, loadData }) {
   const [modalVisible, setModalVisible] = useState(null);
-  const [profile, setProfile] = useState({ name: 'Officer Jenkins', email: 'jenkins@security.com', phone: '+1 (555) 019-2034' });
+  const [profile, setProfile] = useState({ name: data?.user?.name || '', phone: data?.user?.phone || '', gender: data?.user?.gender || 'Male' });
   const [privacy, setPrivacy] = useState({ password: '', confirm: '' });
+
+  useEffect(() => {
+    if (data?.user) setProfile({ name: data.user.name || '', phone: data.user.phone || '', gender: data.user.gender || 'Male' });
+  }, [data]);
+
+  const handleUpdateProfile = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await fetch(`${API_URL}/api/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(profile) });
+      Alert.alert("Success", "Profile updated");
+      setModalVisible(null);
+      if (loadData) loadData();
+    } catch (e) { }
+  };
+
+  const handleUpdatePrivacy = async () => {
+    if (privacy.password !== privacy.confirm) return Alert.alert("Error", "Passwords do not match");
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await fetch(`${API_URL}/api/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ password: privacy.password }) });
+      Alert.alert("Success", "Security settings updated");
+      setModalVisible(null);
+      setPrivacy({ password: '', confirm: '' });
+    } catch (e) { }
+  };
 
   return (
     <ScrollView style={{ flex: 1, padding: 15 }}>
@@ -1079,10 +1448,10 @@ function ProfileTab({ onLogout }) {
         <View style={{ backgroundColor: '#1c3671', height: 80 }} />
         <View style={{ padding: 20, alignItems: 'center', marginTop: -40 }}>
           <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, marginBottom: 10 }}>
-            <Text style={{ fontSize: 40 }}>👮</Text>
+            <Text style={{ fontSize: 40 }}>{profile.gender === 'Female' ? '👮‍♀️' : '👮‍♂️'}</Text>
           </View>
-          <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1e293b' }}>{profile.name}</Text>
-          <Text style={{ color: '#64748b', marginBottom: 20 }}>Security Guard • Main Gate 1</Text>
+          <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1e293b' }}>{profile.name || 'Security Guard'}</Text>
+          <Text style={{ color: '#64748b', marginBottom: 20 }}>{data?.user?.role || 'Staff'} • {data?.society?.name || 'Society'}</Text>
 
           <View style={{ width: '100%', borderTopWidth: 1, borderColor: '#f1f5f9', paddingTop: 15 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
@@ -1127,11 +1496,14 @@ function ProfileTab({ onLogout }) {
             <View style={{ padding: 20 }}>
               <Text style={styles.inputLabel}>Full Name</Text>
               <TextInput style={styles.textInput} value={profile.name} onChangeText={t => setProfile({ ...profile, name: t })} />
-              <Text style={styles.inputLabel}>Email Address</Text>
-              <TextInput style={styles.textInput} value={profile.email} onChangeText={t => setProfile({ ...profile, email: t })} />
               <Text style={styles.inputLabel}>Phone Number</Text>
               <TextInput style={styles.textInput} value={profile.phone} onChangeText={t => setProfile({ ...profile, phone: t })} />
-              <TouchableOpacity style={[styles.buttonPrimary, { marginTop: 20 }]} onPress={() => { Alert.alert("Success", "Profile updated"); setModalVisible(null); }}><Text style={styles.buttonText}>Save Changes</Text></TouchableOpacity>
+              <Text style={styles.inputLabel}>Gender</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                <TouchableOpacity style={[styles.roleBtn, profile.gender === 'Male' && styles.roleBtnActive]} onPress={() => setProfile({ ...profile, gender: 'Male' })}><Text style={[styles.roleBtnText, profile.gender === 'Male' && styles.roleBtnTextActive]}>Male</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.roleBtn, profile.gender === 'Female' && styles.roleBtnActive]} onPress={() => setProfile({ ...profile, gender: 'Female' })}><Text style={[styles.roleBtnText, profile.gender === 'Female' && styles.roleBtnTextActive]}>Female</Text></TouchableOpacity>
+              </View>
+              <TouchableOpacity style={[styles.buttonPrimary, { marginTop: 20 }]} onPress={handleUpdateProfile}><Text style={styles.buttonText}>Save Changes</Text></TouchableOpacity>
             </View>
           </View>
         </View>
@@ -1146,7 +1518,7 @@ function ProfileTab({ onLogout }) {
               <TextInput style={styles.textInput} secureTextEntry placeholder="New Password" value={privacy.password} onChangeText={t => setPrivacy({ ...privacy, password: t })} />
               <Text style={styles.inputLabel}>Confirm Password</Text>
               <TextInput style={styles.textInput} secureTextEntry placeholder="Confirm New Password" value={privacy.confirm} onChangeText={t => setPrivacy({ ...privacy, confirm: t })} />
-              <TouchableOpacity style={[styles.buttonPrimary, { marginTop: 20 }]} onPress={() => { Alert.alert("Success", "Security settings updated"); setModalVisible(null); setPrivacy({ password: '', confirm: '' }); }}><Text style={styles.buttonText}>Save Changes</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.buttonPrimary, { marginTop: 20 }]} onPress={handleUpdatePrivacy}><Text style={styles.buttonText}>Save Changes</Text></TouchableOpacity>
             </View>
           </View>
         </View>
@@ -1165,14 +1537,22 @@ function ProfileTab({ onLogout }) {
 // ==========================================
 function SecretaryMainDashboard({ onLogout }) {
   const [activeTab, setActiveTab] = useState('home');
-  const [data, setData] = useState({ complaints: [], visitors: [], users: [] });
+  const [data, setData] = useState({ complaints: [], visitors: [], users: [], staff: [] });
   const [loading, setLoading] = useState(true);
 
-  const loadData = () => {
-    fetch(`${API_URL}/api/secretary/data`)
-      .then(r => r.json())
-      .then(d => { setData(d); setLoading(false); })
-      .catch(e => { console.error(e); setLoading(false); });
+  const loadData = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await fetch(`${API_URL}/api/secretary/data`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (res.ok) {
+        const d = await res.json();
+        setData(d);
+      }
+      setLoading(false);
+    } catch (e) {
+      console.error(e);
+      setLoading(false);
+    }
   };
 
   useEffect(() => { loadData(); }, []);
@@ -1182,15 +1562,13 @@ function SecretaryMainDashboard({ onLogout }) {
       <View style={[styles.topHeader, { backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#f1f5f9', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <View style={[styles.avatarBubble, { backgroundColor: '#e0e7ff' }]}>
-            <Text style={{ color: '#3730a3', fontWeight: 'bold' }}>SC</Text>
+            <Text style={{ color: '#3730a3', fontWeight: 'bold' }}>{data.user?.name ? data.user.name.charAt(0).toUpperCase() : 'SC'}</Text>
           </View>
           <View>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1e40af' }}>Secretary Hub</Text>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1e40af' }}>{data.user?.name || 'Secretary Hub'}</Text>
+            <Text style={{ fontSize: 12, color: '#64748b' }}>{data.society?.name || 'Loading Society...'}</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={onLogout} style={{ padding: 4, borderRadius: 20 }}>
-          <MaterialIcons name="logout" size={24} color="#ef4444" />
-        </TouchableOpacity>
       </View>
 
       <View style={styles.contentArea}>
@@ -1199,9 +1577,9 @@ function SecretaryMainDashboard({ onLogout }) {
         ) : (
           <>
             {activeTab === 'home' && <SecretaryHomeTab data={data} loadData={loadData} />}
-            {activeTab === 'finances' && <SecretaryFinancesTab />}
+            {activeTab === 'finances' && <SecretaryFinancesTab data={data} loadData={loadData} />}
             {activeTab === 'requests' && <SecretaryRequestsTab data={data} loadData={loadData} />}
-            {activeTab === 'settings' && <SecretarySettingsTab />}
+            {activeTab === 'settings' && <SecretarySettingsTab data={data} loadData={loadData} onLogout={onLogout} />}
           </>
         )}
       </View>
@@ -1219,27 +1597,47 @@ function SecretaryMainDashboard({ onLogout }) {
 function SecretaryHomeTab({ data, loadData }) {
   const [modalVisible, setModalVisible] = useState(null);
   const [form, setForm] = useState({ role: 'Resident' });
+  const [staffForm, setStaffForm] = useState({ role: 'Security' });
+  const [selectedUserDetails, setSelectedUserDetails] = useState(null);
+
+  const handleShareCredentials = async () => {
+    if (!selectedUserDetails) return;
+    try {
+      const message = `SocioHub Resident Credentials\n\nName: ${selectedUserDetails.name}\nApp Login ID: ${selectedUserDetails.loginId || selectedUserDetails.phone}\nPassword: ${selectedUserDetails.password}\n\nPlease download the SocioHub app to log in!`;
+      await Share.share({ message });
+    } catch (error) {
+      console.log(error);
+    }
+  };
 
   const activeComplaints = data.complaints.filter(c => c.status === 'OPEN');
 
   const handleBroadcast = async () => {
     try {
-      await fetch(`${API_URL}/api/secretary/notice`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      const token = await AsyncStorage.getItem('userToken');
+      await fetch(`${API_URL}/api/secretary/notice`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(form) });
       Alert.alert("Success", "Notice Broadcasted!");
       setModalVisible(null); setForm({ role: 'Resident' });
     } catch (e) { }
   };
 
-  const handleUserAction = async (action, id = null) => {
+  const handleUserAction = async (action, id = null, type = 'user') => {
     try {
-      await fetch(`${API_URL}/api/secretary/users`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, id, ...form }) });
-      setModalVisible(null); setForm({ role: 'Resident' }); loadData();
+      const token = await AsyncStorage.getItem('userToken');
+      const actionForm = type === 'staff' ? staffForm : form;
+      await fetch(`${API_URL}/api/secretary/users`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ action, id, ...actionForm }) });
+      setModalVisible(null);
+      setForm({ role: 'Resident' });
+      setStaffForm({ role: 'Security' });
+      loadData();
+      if (action === 'delete') setSelectedUserDetails(null);
     } catch (e) { }
   };
 
   const handleResolve = async (id) => {
     try {
-      await fetch(`${API_URL}/api/secretary/complaints`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'RESOLVED' }) });
+      const token = await AsyncStorage.getItem('userToken');
+      await fetch(`${API_URL}/api/secretary/complaints`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ id, status: 'RESOLVED' }) });
       loadData();
     } catch (e) { }
   };
@@ -1247,14 +1645,22 @@ function SecretaryHomeTab({ data, loadData }) {
   return (
     <ScrollView style={{ flex: 1, padding: 15 }}>
       <View style={[styles.gridContainer, { marginTop: 10, marginBottom: 20 }]}>
-        <TouchableOpacity style={[styles.gridBtnAlt, { width: '48%', minHeight: 120, padding: 15, justifyContent: 'center' }]} onPress={() => setModalVisible('users')}>
-          <View style={[styles.gridIconBubble, { backgroundColor: '#e0e7ff', width: 50, height: 50, borderRadius: 25 }]}><MaterialIcons name="groups" size={28} color="#4f46e5" /></View>
-          <Text style={[styles.gridBtnTextAlt, { fontSize: 14, marginTop: 10, textAlign: 'center' }]}>Manage Users</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.gridBtnAlt, { width: '48%', minHeight: 120, padding: 15, justifyContent: 'center' }]} onPress={() => setModalVisible('broadcast')}>
-          <View style={[styles.gridIconBubble, { backgroundColor: '#f3e8ff', width: 50, height: 50, borderRadius: 25 }]}><MaterialIcons name="campaign" size={28} color="#9333ea" /></View>
-          <Text style={[styles.gridBtnTextAlt, { fontSize: 14, marginTop: 10, textAlign: 'center' }]}>Broadcast Notice</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+          <TouchableOpacity style={[styles.gridBtnAlt, { width: '48%', minHeight: 120, padding: 15, justifyContent: 'center' }]} onPress={() => setModalVisible('users')}>
+            <View style={[styles.gridIconBubble, { backgroundColor: '#e0e7ff', width: 50, height: 50, borderRadius: 25 }]}><MaterialIcons name="groups" size={28} color="#4f46e5" /></View>
+            <Text style={[styles.gridBtnTextAlt, { fontSize: 14, marginTop: 10, textAlign: 'center' }]}>Manage Residents</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.gridBtnAlt, { width: '48%', minHeight: 120, padding: 15, justifyContent: 'center' }]} onPress={() => setModalVisible('staff')}>
+            <View style={[styles.gridIconBubble, { backgroundColor: '#fef08a', width: 50, height: 50, borderRadius: 25 }]}><MaterialIcons name="engineering" size={28} color="#ca8a04" /></View>
+            <Text style={[styles.gridBtnTextAlt, { fontSize: 14, marginTop: 10, textAlign: 'center' }]}>Manage Staff</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <TouchableOpacity style={[styles.gridBtnAlt, { width: '100%', minHeight: 90, padding: 15, justifyContent: 'center', flexDirection: 'row', alignItems: 'center', backgroundColor: '#8b5cf6', borderWidth: 0, shadowColor: '#8b5cf6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 }]} onPress={() => setModalVisible('broadcast')}>
+            <View style={[styles.gridIconBubble, { backgroundColor: 'rgba(255, 255, 255, 0.25)', width: 50, height: 50, borderRadius: 25, marginRight: 15 }]}><MaterialIcons name="campaign" size={28} color="#ffffff" /></View>
+            <Text style={[styles.gridBtnTextAlt, { fontSize: 18, color: '#ffffff', fontWeight: 'bold', letterSpacing: 0.5 }]}>Broadcast Notice</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <Text style={styles.sectionTitle}>Active Complaints ({activeComplaints.length})</Text>
@@ -1286,6 +1692,16 @@ function SecretaryHomeTab({ data, loadData }) {
           <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#0ea5e9', backgroundColor: '#e0f2fe', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, overflow: 'hidden' }}>EXPECTED</Text>
         </View>
       ))}
+
+      <Text style={[styles.sectionTitle, { marginTop: 10 }]}>Recent Broadcasts ({(data.notices || []).length})</Text>
+      {(!data.notices || data.notices.length === 0) ? <Text style={{ color: '#94a3b8' }}>No broadcasts yet.</Text> : data.notices.map(n => (
+        <View key={n.id} style={{ backgroundColor: '#fff', padding: 15, borderRadius: 10, marginBottom: 10, borderLeftWidth: 4, borderLeftColor: '#8b5cf6' }}>
+          <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#1e293b', marginBottom: 5 }}>{n.title}</Text>
+          <Text style={{ fontSize: 14, color: '#475569', marginBottom: 10 }}>{n.content}</Text>
+          <Text style={{ fontSize: 10, color: '#94a3b8', textAlign: 'right' }}>{new Date(n.createdAt).toLocaleDateString()}</Text>
+        </View>
+      ))}
+
       <View style={{ height: 50 }} />
 
       {/* Broadcast Modal */}
@@ -1304,37 +1720,32 @@ function SecretaryHomeTab({ data, loadData }) {
         </View>
       </Modal>
 
-      {/* Manage Users Modal */}
+      {/* Manage Residents Modal */}
       <Modal visible={modalVisible === 'users'} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxHeight: '90%' }]}>
-            <View style={styles.modalHeader}><Text style={styles.modalTitle}>Manage Users</Text><TouchableOpacity onPress={() => setModalVisible(null)}><MaterialIcons name="close" size={24} color="#fff" /></TouchableOpacity></View>
+            <View style={styles.modalHeader}><Text style={styles.modalTitle}>Manage Residents</Text><TouchableOpacity onPress={() => setModalVisible(null)}><MaterialIcons name="close" size={24} color="#fff" /></TouchableOpacity></View>
             <ScrollView style={{ padding: 20 }}>
               <View style={{ backgroundColor: '#f8fafc', padding: 15, borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 20 }}>
-                <Text style={{ fontWeight: 'bold', marginBottom: 10 }}>Add New User</Text>
+                <Text style={{ fontWeight: 'bold', marginBottom: 10 }}>Add New Resident</Text>
                 <TextInput style={[styles.textInput, { marginBottom: 10, backgroundColor: '#fff' }]} placeholder="Full Name" onChangeText={t => setForm({ ...form, name: t })} />
-                <View style={{ flexDirection: 'row', marginBottom: 10 }}>
-                  <TouchableOpacity onPress={() => setForm({ ...form, role: 'Resident' })} style={{ flex: 1, backgroundColor: form.role === 'Resident' ? '#0ea5e9' : '#fff', padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0', borderTopLeftRadius: 5, borderBottomLeftRadius: 5 }}><Text style={{ color: form.role === 'Resident' ? '#fff' : '#64748b', fontWeight: 'bold' }}>Resident</Text></TouchableOpacity>
-                  <TouchableOpacity onPress={() => setForm({ ...form, role: 'Guard' })} style={{ flex: 1, backgroundColor: form.role === 'Guard' ? '#0ea5e9' : '#fff', padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' }}><Text style={{ color: form.role === 'Guard' ? '#fff' : '#64748b', fontWeight: 'bold' }}>Guard</Text></TouchableOpacity>
-                  <TouchableOpacity onPress={() => setForm({ ...form, role: 'Secretary' })} style={{ flex: 1, backgroundColor: form.role === 'Secretary' ? '#0ea5e9' : '#fff', padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0', borderTopRightRadius: 5, borderBottomRightRadius: 5 }}><Text style={{ color: form.role === 'Secretary' ? '#fff' : '#64748b', fontWeight: 'bold' }}>Secretary</Text></TouchableOpacity>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <TextInput style={[styles.textInput, { flex: 1, marginRight: 5, backgroundColor: '#fff' }]} placeholder="Apt (e.g. 402)" onChangeText={t => setForm({ ...form, apartment: t })} />
+                  <TextInput style={[styles.textInput, { flex: 1, marginLeft: 5, backgroundColor: '#fff' }]} placeholder="Tower (e.g. A)" onChangeText={t => setForm({ ...form, tower: t })} />
                 </View>
-                {form.role === 'Resident' && (
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <TextInput style={[styles.textInput, { flex: 1, marginRight: 5, backgroundColor: '#fff' }]} placeholder="Apt (e.g. 402)" onChangeText={t => setForm({ ...form, apartment: t })} />
-                    <TextInput style={[styles.textInput, { flex: 1, marginLeft: 5, backgroundColor: '#fff' }]} placeholder="Tower (e.g. A)" onChangeText={t => setForm({ ...form, tower: t })} />
-                  </View>
-                )}
-                <TouchableOpacity style={[styles.buttonPrimary, { marginTop: 15 }]} onPress={() => handleUserAction('create')}><Text style={styles.buttonText}>Add</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.buttonPrimary, { marginTop: 15 }]} onPress={() => handleUserAction('create', null, 'user')}><Text style={styles.buttonText}>Add Resident</Text></TouchableOpacity>
               </View>
 
-              <Text style={{ fontWeight: 'bold', marginBottom: 10 }}>Registered Users ({data.users.length})</Text>
+              <Text style={{ fontWeight: 'bold', marginBottom: 10 }}>Registered Residents ({data.users.length})</Text>
               {data.users.map(u => (
                 <View key={u.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: 10, borderRadius: 8, marginBottom: 5, borderWidth: 1, borderColor: '#f1f5f9' }}>
                   <View>
                     <Text style={{ fontWeight: 'bold' }}>{u.name}</Text>
                     <Text style={{ fontSize: 10, color: '#64748b' }}>{u.role} {u.role === 'Resident' && u.tower ? `• Tower ${u.tower}, Apt ${u.apartment}` : ''}</Text>
                   </View>
-                  <TouchableOpacity onPress={() => handleUserAction('delete', u.id)}><MaterialIcons name="delete" size={20} color="#ef4444" /></TouchableOpacity>
+                  <TouchableOpacity onPress={() => setSelectedUserDetails(u)} style={{ backgroundColor: '#e0e7ff', padding: 8, borderRadius: 20 }}>
+                    <Text style={{ color: '#4f46e5', fontWeight: 'bold', fontSize: 12 }}>View</Text>
+                  </TouchableOpacity>
                 </View>
               ))}
               <View style={{ height: 50 }} />
@@ -1342,49 +1753,186 @@ function SecretaryHomeTab({ data, loadData }) {
           </View>
         </View>
       </Modal>
+
+      {/* Manage Staff Modal */}
+      <Modal visible={modalVisible === 'staff'} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+            <View style={styles.modalHeader}><Text style={styles.modalTitle}>Manage Staff</Text><TouchableOpacity onPress={() => setModalVisible(null)}><MaterialIcons name="close" size={24} color="#fff" /></TouchableOpacity></View>
+            <ScrollView style={{ padding: 20 }}>
+              <View style={{ backgroundColor: '#f8fafc', padding: 15, borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 20 }}>
+                <Text style={{ fontWeight: 'bold', marginBottom: 10 }}>Add New Staff</Text>
+                <TextInput style={[styles.textInput, { marginBottom: 10, backgroundColor: '#fff' }]} placeholder="Full Name" onChangeText={t => setStaffForm({ ...staffForm, name: t })} />
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 5 }}>
+                  <TouchableOpacity onPress={() => setStaffForm({ ...staffForm, role: 'Security' })} style={{ width: '48%', marginBottom: 10, backgroundColor: staffForm.role === 'Security' ? '#0ea5e9' : '#fff', padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 5 }}><Text style={{ color: staffForm.role === 'Security' ? '#fff' : '#64748b', fontWeight: 'bold', fontSize: 12 }}>Security</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => setStaffForm({ ...staffForm, role: 'Sweeper' })} style={{ width: '48%', marginBottom: 10, backgroundColor: staffForm.role === 'Sweeper' ? '#0ea5e9' : '#fff', padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 5 }}><Text style={{ color: staffForm.role === 'Sweeper' ? '#fff' : '#64748b', fontWeight: 'bold', fontSize: 12 }}>Sweeper</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => setStaffForm({ ...staffForm, role: 'Plumber' })} style={{ width: '48%', marginBottom: 10, backgroundColor: staffForm.role === 'Plumber' ? '#0ea5e9' : '#fff', padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 5 }}><Text style={{ color: staffForm.role === 'Plumber' ? '#fff' : '#64748b', fontWeight: 'bold', fontSize: 12 }}>Plumber</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => setStaffForm({ ...staffForm, role: 'Electrician' })} style={{ width: '48%', marginBottom: 10, backgroundColor: staffForm.role === 'Electrician' ? '#0ea5e9' : '#fff', padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 5 }}><Text style={{ color: staffForm.role === 'Electrician' ? '#fff' : '#64748b', fontWeight: 'bold', fontSize: 12 }}>Electrician</Text></TouchableOpacity>
+                </View>
+                <TouchableOpacity style={[styles.buttonPrimary]} onPress={() => handleUserAction('create', null, 'staff')}><Text style={styles.buttonText}>Add Staff</Text></TouchableOpacity>
+              </View>
+
+              <Text style={{ fontWeight: 'bold', marginBottom: 10 }}>Registered Staff ({(data.staff || []).length})</Text>
+              {(data.staff || []).map(u => (
+                <View key={u.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: 10, borderRadius: 8, marginBottom: 5, borderWidth: 1, borderColor: '#f1f5f9' }}>
+                  <View>
+                    <Text style={{ fontWeight: 'bold' }}>{u.name}</Text>
+                    <Text style={{ fontSize: 10, color: '#64748b', fontWeight: 'bold', marginTop: 2 }}>{u.role}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setSelectedUserDetails(u)} style={{ backgroundColor: '#e0e7ff', padding: 8, borderRadius: 20 }}>
+                    <Text style={{ color: '#4f46e5', fontWeight: 'bold', fontSize: 12 }}>View</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              <View style={{ height: 50 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* User Details Modal */}
+      <Modal visible={!!selectedUserDetails} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Resident Details</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+
+                <TouchableOpacity onPress={() => handleUserAction('delete', selectedUserDetails?.id)} style={{ marginRight: 15 }}>
+                  <MaterialIcons name="delete" size={24} color="#ef4444" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setSelectedUserDetails(null)}>
+                  <MaterialIcons name="close" size={24} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
+            {selectedUserDetails && (
+              <ScrollView style={{ padding: 20 }}>
+                <View style={{ backgroundColor: '#f8fafc', padding: 15, borderRadius: 10, marginBottom: 15 }}>
+                  <Text style={{ fontSize: 20, fontWeight: 'bold' }}>{selectedUserDetails.name}</Text>
+                  <Text style={{ color: '#64748b', marginTop: 5 }}>
+                    {selectedUserDetails.role} • Tower {selectedUserDetails.tower}, Apt {selectedUserDetails.apartment}
+                  </Text>
+                </View>
+
+                <View style={{ backgroundColor: '#fff', padding: 15, borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 15 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <View>
+                      <Text style={{ fontSize: 10, color: '#64748b', fontWeight: 'bold' }}>APP LOGIN ID</Text>
+                      <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#0ea5e9' }}>{selectedUserDetails.loginId || selectedUserDetails.phone}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ fontSize: 10, color: '#64748b', fontWeight: 'bold' }}>PASSWORD</Text>
+                      <Text style={{ fontSize: 16, fontWeight: 'bold' }}>{selectedUserDetails.password}</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {selectedUserDetails.familyMembers && selectedUserDetails.familyMembers.length > 0 && (
+                  <View style={{ marginBottom: 15 }}>
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#1e293b', marginBottom: 10 }}>Family Members</Text>
+                    {selectedUserDetails.familyMembers.map(fm => (
+                      <View key={fm.id} style={{ backgroundColor: '#f1f5f9', padding: 10, borderRadius: 8, marginBottom: 5, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View>
+                          <Text style={{ fontWeight: 'bold', color: '#1e293b' }}>{fm.name}</Text>
+                          <Text style={{ fontSize: 12, color: '#64748b' }}>{fm.relationship} • {fm.age} yrs</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                <TouchableOpacity onPress={handleShareCredentials} style={[styles.buttonPrimary, { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 10 }]}>
+                  <MaterialIcons name="share" size={20} color="#fff" style={{ marginRight: 8 }} />
+                  <Text style={styles.buttonText}>Share Credentials</Text>
+                </TouchableOpacity>
+                <View style={{ height: 50 }} />
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
 
-function SecretaryFinancesTab() {
+function SecretaryFinancesTab({ data, loadData }) {
+  const allInvoices = data.users?.flatMap(u => u.invoices || []) || [];
+  const expenses = data.expenses || [];
+  
+  const totalIncoming = allInvoices.filter(i => i.status === 'PAID').reduce((acc, curr) => acc + curr.amount, 0);
+  const totalOutgoing = expenses.reduce((acc, curr) => acc + curr.amount, 0);
+  
+  const totalBalance = totalIncoming - totalOutgoing;
+  const pendingDues = allInvoices.filter(i => i.status === 'PENDING').reduce((acc, curr) => acc + curr.amount, 0);
+
+  // Get 10 most recent transactions (invoices and expenses)
+  const recentTransactions = [...allInvoices, ...expenses.map(e => ({...e, isExpense: true}))]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 10);
+
+  const currentMonthLabel = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+  const isPayrollDone = expenses.some(e => e.title && e.title.includes(currentMonthLabel));
+
+  const runPayroll = async () => {
+    if (isPayrollDone) {
+      Alert.alert('Notice', 'Already paid for the current month');
+      return;
+    }
+    
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await fetch(`${API_URL}/api/secretary/payroll`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+      if (!res.ok) throw new Error('API Error');
+      Alert.alert('Success', 'Monthly salaries distributed successfully!');
+      loadData();
+    } catch (e) {
+      Alert.alert('Error', 'Failed to run payroll');
+    }
+  };
+
   return (
     <ScrollView style={{ flex: 1, padding: 15 }}>
-      <Text style={[styles.sectionTitle, { fontSize: 24 }]}>Financial Overview</Text>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+        <Text style={[styles.sectionTitle, { fontSize: 24, marginBottom: 0 }]}>Financial Overview</Text>
+        <TouchableOpacity 
+          onPress={runPayroll} 
+          style={{ backgroundColor: isPayrollDone ? '#94a3b8' : '#10b981', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', opacity: isPayrollDone ? 0.7 : 1 }}
+        >
+          <MaterialIcons name="payments" size={16} color="#fff" style={{ marginRight: 5 }} />
+          <Text style={{ color: '#fff', fontWeight: 'bold' }}>{isPayrollDone ? 'Paid' : 'Run Payroll'}</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
         <View style={{ width: '48%', backgroundColor: '#0ea5e9', padding: 15, borderRadius: 15, shadowColor: '#000', shadowOpacity: 0.1 }}>
           <MaterialIcons name="account-balance-wallet" size={24} color="#e0f2fe" style={{ marginBottom: 5 }} />
-          <Text style={{ color: '#e0f2fe', fontSize: 10, fontWeight: 'bold' }}>TOTAL BALANCE</Text>
-          <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>$45,230</Text>
+          <Text style={{ color: '#e0f2fe', fontSize: 10, fontWeight: 'bold' }}>TOTAL BALANCE (PAID)</Text>
+          <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>${totalBalance.toFixed(2)}</Text>
         </View>
         <View style={{ width: '48%', backgroundColor: '#fff', padding: 15, borderRadius: 15, borderWidth: 1, borderColor: '#e2e8f0' }}>
           <MaterialIcons name="pending-actions" size={24} color="#f59e0b" style={{ marginBottom: 5 }} />
           <Text style={{ color: '#64748b', fontSize: 10, fontWeight: 'bold' }}>PENDING DUES</Text>
-          <Text style={{ color: '#1e293b', fontSize: 24, fontWeight: 'bold' }}>$3,150</Text>
+          <Text style={{ color: '#1e293b', fontSize: 24, fontWeight: 'bold' }}>${pendingDues.toFixed(2)}</Text>
         </View>
       </View>
 
       <Text style={styles.sectionTitle}>Recent Transactions</Text>
-      <View style={{ backgroundColor: '#fff', padding: 15, borderRadius: 10, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#dcfce7', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}><MaterialIcons name="arrow-downward" size={20} color="#16a34a" /></View>
-          <View>
-            <Text style={{ fontWeight: 'bold', color: '#1e293b' }}>Maintenance Fee</Text>
-            <Text style={{ fontSize: 12, color: '#64748b' }}>Unit 402 • Today</Text>
+      {recentTransactions.length === 0 ? <Text style={{ color: '#94a3b8' }}>No transactions found.</Text> : recentTransactions.map(t => (
+        <View key={t.id} style={{ backgroundColor: '#fff', padding: 15, borderRadius: 10, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: t.isExpense ? '#fee2e2' : t.status === 'PAID' ? '#dcfce7' : '#fef3c7', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+              <MaterialIcons name={t.isExpense ? 'money-off' : t.status === 'PAID' ? 'check-circle' : 'pending'} size={20} color={t.isExpense ? '#ef4444' : t.status === 'PAID' ? '#16a34a' : '#d97706'} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontWeight: 'bold', color: '#1e293b' }}>{t.title}</Text>
+              <Text style={{ fontSize: 12, color: '#64748b' }}>{t.isExpense ? 'SALARY OUT' : t.status} • {new Date(t.createdAt).toLocaleDateString()}</Text>
+            </View>
           </View>
+          <Text style={{ fontWeight: 'bold', color: t.isExpense ? '#ef4444' : t.status === 'PAID' ? '#16a34a' : '#d97706' }}>{t.isExpense ? '-' : ''}${t.amount.toFixed(2)}</Text>
         </View>
-        <Text style={{ fontWeight: 'bold', color: '#16a34a' }}>+$150</Text>
-      </View>
-      <View style={{ backgroundColor: '#fff', padding: 15, borderRadius: 10, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}><MaterialIcons name="arrow-upward" size={20} color="#ef4444" /></View>
-          <View>
-            <Text style={{ fontWeight: 'bold', color: '#1e293b' }}>Plumbing Repair</Text>
-            <Text style={{ fontSize: 12, color: '#64748b' }}>Vendor Payout • Yesterday</Text>
-          </View>
-        </View>
-        <Text style={{ fontWeight: 'bold', color: '#1e293b' }}>-$420</Text>
-      </View>
+      ))}
+      <View style={{ height: 50 }} />
     </ScrollView>
   );
 }
@@ -1461,44 +2009,31 @@ function SecretaryRequestsTab({ data, loadData }) {
   );
 }
 
-function SecretarySettingsTab() {
-  return (
-    <ScrollView style={{ flex: 1, padding: 15 }}>
-      <View style={{ backgroundColor: '#fff', borderRadius: 15, overflow: 'hidden', marginBottom: 20, borderWidth: 1, borderColor: '#f1f5f9' }}>
-        <View style={{ height: 80, backgroundColor: '#e0e7ff' }}></View>
-        <View style={{ padding: 20, paddingTop: 40, alignItems: 'center' }}>
-          <View style={{ position: 'absolute', top: -30, width: 60, height: 60, borderRadius: 30, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff', shadowColor: '#000', shadowOpacity: 0.1 }}>
-            <Text style={{ fontSize: 30 }}>👩‍💼</Text>
-          </View>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#1e293b' }}>Sarah Connor</Text>
-          <Text style={{ color: '#64748b', marginBottom: 20 }}>Secretary • Metropolis Tower</Text>
-
-          <View style={{ width: '100%', borderTopWidth: 1, borderColor: '#f1f5f9', paddingTop: 15, paddingBottom: 15 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
-              <MaterialIcons name="email" size={24} color="#0ea5e9" style={{ marginRight: 10 }} />
-              <View>
-                <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#64748b' }}>CONTACT</Text>
-                <Text style={{ fontWeight: 'bold', color: '#1e293b' }}>secretary@metropolis.com</Text>
-              </View>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <MaterialIcons name="shield" size={24} color="#0ea5e9" style={{ marginRight: 10 }} />
-              <View>
-                <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#64748b' }}>ACCESS LEVEL</Text>
-                <Text style={{ fontWeight: 'bold', color: '#1e293b' }}>Administrative</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-      </View>
-    </ScrollView>
-  );
-}
-
-function SecretaryProfileTab({ onLogout }) {
+function SecretarySettingsTab({ data, loadData, onLogout }) {
   const [modalVisible, setModalVisible] = useState(null);
-  const [profile, setProfile] = useState({ name: 'Sarah Miller', email: 'sarah@estatepillar.com', phone: '+1 (555) 012-3456' });
+  const [profile, setProfile] = useState({ name: data?.user?.name || '', phone: data?.user?.phone || '', gender: data?.user?.gender || 'Male' });
   const [privacy, setPrivacy] = useState({ password: '', confirm: '' });
+
+  const handleUpdateProfile = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await fetch(`${API_URL}/api/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(profile) });
+      Alert.alert("Success", "Profile updated");
+      setModalVisible(null);
+      loadData();
+    } catch (e) { }
+  };
+
+  const handleUpdatePrivacy = async () => {
+    if (privacy.password !== privacy.confirm) return Alert.alert("Error", "Passwords do not match");
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await fetch(`${API_URL}/api/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ password: privacy.password }) });
+      Alert.alert("Success", "Security settings updated");
+      setModalVisible(null);
+      setPrivacy({ password: '', confirm: '' });
+    } catch (e) { }
+  };
 
   return (
     <ScrollView style={{ flex: 1, padding: 15 }}>
@@ -1506,10 +2041,10 @@ function SecretaryProfileTab({ onLogout }) {
         <View style={{ backgroundColor: '#1e1b4b', height: 80 }} />
         <View style={{ padding: 20, alignItems: 'center', marginTop: -40 }}>
           <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, marginBottom: 10 }}>
-            <Text style={{ fontSize: 40 }}>👩‍💼</Text>
+            <Text style={{ fontSize: 40 }}>{data?.user?.gender?.toLowerCase() === 'female' ? '👩‍💼' : '👨‍💼'}</Text>
           </View>
-          <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1e293b' }}>{profile.name}</Text>
-          <Text style={{ color: '#64748b', marginBottom: 20 }}>Secretary • Administration</Text>
+          <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1e293b' }}>{data?.user?.name || profile.name}</Text>
+          <Text style={{ color: '#64748b', marginBottom: 20 }}>Secretary • {data?.society?.name || 'Society'}</Text>
         </View>
       </View>
 
@@ -1530,11 +2065,14 @@ function SecretaryProfileTab({ onLogout }) {
             <View style={{ padding: 20 }}>
               <Text style={styles.inputLabel}>Full Name</Text>
               <TextInput style={styles.textInput} value={profile.name} onChangeText={t => setProfile({ ...profile, name: t })} />
-              <Text style={styles.inputLabel}>Email Address</Text>
-              <TextInput style={styles.textInput} value={profile.email} onChangeText={t => setProfile({ ...profile, email: t })} />
               <Text style={styles.inputLabel}>Phone Number</Text>
               <TextInput style={styles.textInput} value={profile.phone} onChangeText={t => setProfile({ ...profile, phone: t })} />
-              <TouchableOpacity style={[styles.buttonPrimary, { marginTop: 20 }]} onPress={() => { Alert.alert("Success", "Profile updated"); setModalVisible(null); }}><Text style={styles.buttonText}>Save Changes</Text></TouchableOpacity>
+              <Text style={styles.inputLabel}>Gender</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                <TouchableOpacity style={[styles.roleBtn, profile.gender === 'Male' && styles.roleBtnActive]} onPress={() => setProfile({ ...profile, gender: 'Male' })}><Text style={[styles.roleBtnText, profile.gender === 'Male' && styles.roleBtnTextActive]}>Male</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.roleBtn, profile.gender === 'Female' && styles.roleBtnActive]} onPress={() => setProfile({ ...profile, gender: 'Female' })}><Text style={[styles.roleBtnText, profile.gender === 'Female' && styles.roleBtnTextActive]}>Female</Text></TouchableOpacity>
+              </View>
+              <TouchableOpacity style={[styles.buttonPrimary, { marginTop: 20 }]} onPress={handleUpdateProfile}><Text style={styles.buttonText}>Save Changes</Text></TouchableOpacity>
             </View>
           </View>
         </View>
@@ -1549,7 +2087,7 @@ function SecretaryProfileTab({ onLogout }) {
               <TextInput style={styles.textInput} secureTextEntry placeholder="New Password" value={privacy.password} onChangeText={t => setPrivacy({ ...privacy, password: t })} />
               <Text style={styles.inputLabel}>Confirm Password</Text>
               <TextInput style={styles.textInput} secureTextEntry placeholder="Confirm New Password" value={privacy.confirm} onChangeText={t => setPrivacy({ ...privacy, confirm: t })} />
-              <TouchableOpacity style={[styles.buttonPrimary, { marginTop: 20 }]} onPress={() => { Alert.alert("Success", "Security settings updated"); setModalVisible(null); setPrivacy({ password: '', confirm: '' }); }}><Text style={styles.buttonText}>Save Changes</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.buttonPrimary, { marginTop: 20 }]} onPress={handleUpdatePrivacy}><Text style={styles.buttonText}>Save Changes</Text></TouchableOpacity>
             </View>
           </View>
         </View>

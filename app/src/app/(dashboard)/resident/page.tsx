@@ -177,7 +177,7 @@ export default function ResidentDashboard() {
             R
           </div>
           <div>
-            <div className="font-headline-md text-headline-md font-bold text-primary">Estate Pillar</div>
+            <div className="font-headline-md text-headline-md font-bold text-primary">SocioHub</div>
             <div className="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-status-success inline-block"></span> Unit 402
             </div>

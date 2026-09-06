@@ -4,6 +4,13 @@ import { revalidatePath } from 'next/cache';
 
 export async function POST(request: Request) {
   try {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const userId = authHeader.replace('Bearer ', '');
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+
     const { name, age, guestCount, phone } = await request.json();
     
     const qrToken = Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -18,15 +25,17 @@ export async function POST(request: Request) {
         phone,
         qrToken,
         expiresAt,
-        destination: 'Unit 402',
+        destination: `Tower ${user.tower}, Apt ${user.apartment}`,
         status: 'Pre-Authorized',
-        icon: 'person'
+        icon: 'person',
+        societyId: user.societyId
       }
     });
 
     revalidatePath('/guard');
     return NextResponse.json({ id: visitor.id, qrToken: visitor.qrToken });
   } catch (error) {
+    console.error(error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
