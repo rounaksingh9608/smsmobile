@@ -783,9 +783,14 @@ function ResidentComplaintsTab({ complaints, loadData }) {
 
   const handleComplaint = async () => {
     try {
-      await fetch(`${API_URL}/api/resident/complaints`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
-      Alert.alert("Success", "Complaint raised!");
-      setModalVisible(false); setForm({}); loadData();
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await fetch(`${API_URL}/api/resident/complaints`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(form) });
+      if (res.ok) {
+        Alert.alert("Success", "Complaint raised!");
+        setModalVisible(false); setForm({}); loadData();
+      } else {
+        Alert.alert("Error", "Could not raise complaint");
+      }
     } catch (e) { }
   };
 
