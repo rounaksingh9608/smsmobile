@@ -47,7 +47,10 @@ async function main() {
     societies.push({
       name: `Society ${i}`,
       city: 'Metropolis',
-      status: 'ACTIVE'
+      status: 'ACTIVE',
+      phone: '1234567890',
+      email: `admin@society${i}.com`,
+      password: 'password123'
     });
   }
   await prisma.society.createMany({ data: societies });
